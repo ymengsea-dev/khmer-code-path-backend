@@ -1,0 +1,36 @@
+# minio container
+services:
+  #  minio container
+  storage:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z-cpuv1
+    container_name: minio
+    environment:
+      MINIO_ROOT_USER: ${MINIO_USERNAME_ENV}
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD_ENV}
+    ports:
+      - "9000:9000" #minio API
+      - "9001:9001" #minio console
+    command: server --console-address ":9001" /data
+    volumes:
+      - minio_data:/data
+  # redis container
+  redis:
+    image: redis:latest
+    container_name: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  # web dashboard (Redis Insight)
+  redis-insight:
+    image: redislabs/redisinsight:latest
+    container_name: redis-insight
+    ports:
+      - "5540:5540"
+    depends_on:
+      - redis
+
+volumes:
+  minio_data:
+  redis_data:
