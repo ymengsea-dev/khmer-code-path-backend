@@ -13,7 +13,8 @@ spring:
     driver-class-name: org.postgresql.Driver
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
-    hibernate: update
+    hibernate:
+      ddl-auto: update
     show-sql: true
   servlet:
     multipart:
@@ -25,6 +26,29 @@ spring:
       port: ${REDIS_PORT}
   cache:
     type: redis
+
+  ai:
+    model:
+      embedding:
+        text: google-genai
+
+    google:
+      genai:
+        api-key: ${GOOGLE_AI_API_KEY}
+        chat:
+          options:
+            model: ${GOOGLE_AI_MODEL}
+            temperature: 0.7
+        embedding:
+          api-key: ${GOOGLE_AI_API_KEY}
+          text:
+            options:
+              model: text-embedding-004
+
+    vectorstore:
+      pgvector:
+        initialize-schema: true
+        dimensions: 768
 
 jwt:
   secret: ${JWT_SECRET}

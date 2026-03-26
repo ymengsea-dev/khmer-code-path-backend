@@ -31,6 +31,20 @@ services:
     depends_on:
       - redis
 
+  # postgres
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: postgres-pgvector
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: khmercodepathdb
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
 volumes:
   minio_data:
   redis_data:
+  pgdata:
