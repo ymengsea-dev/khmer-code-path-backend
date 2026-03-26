@@ -1,0 +1,32 @@
+RAG (Retrieval-Augmented Generation) is an architecture in natural language processing that combines information retrieval with generative models.
+
+Core mechanism:
+
+A query is received.
+A retriever searches an external knowledge source (e.g., vector database, documents, APIs) for relevant context.
+Retrieved data is injected into the prompt.
+A generative model produces an answer conditioned on both the query and retrieved context.
+
+Purpose:
+
+Reduces hallucination by grounding outputs in real data.
+Enables access to up-to-date or domain-specific information without retraining the model.
+
+Typical components:
+
+Embedding model: converts text into vectors.
+Vector store: stores embeddings (e.g., FAISS, Pinecone).
+Retriever: finds nearest neighbors.
+Generator: large language model (e.g., GPT).
+
+Basic flow:
+
+Indexing phase: documents → embeddings → stored in vector database.
+Query phase: user query → embedding → similarity search → top-k documents → appended to prompt → generation.
+
+Common use cases:
+
+Question answering over private data
+Document search
+Customer support automation
+Knowledge base systems
