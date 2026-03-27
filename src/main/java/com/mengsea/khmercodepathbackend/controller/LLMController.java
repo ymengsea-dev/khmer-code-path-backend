@@ -1,8 +1,7 @@
 package com.mengsea.khmercodepathbackend.controller;
 
-import com.google.genai.errors.ClientException;
-import com.mengsea.khmercodepathbackend.services.ChatService;
-import com.mengsea.khmercodepathbackend.services.RAGService;
+import com.mengsea.khmercodepathbackend.services.ai.ChatService;
+import com.mengsea.khmercodepathbackend.services.ai.RAGService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;

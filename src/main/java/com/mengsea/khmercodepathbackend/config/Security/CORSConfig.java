@@ -1,4 +1,4 @@
-package com.mengsea.khmercodepathbackend.config;
+package com.mengsea.khmercodepathbackend.config.Security;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;

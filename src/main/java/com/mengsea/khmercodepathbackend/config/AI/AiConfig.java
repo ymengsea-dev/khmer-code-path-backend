@@ -1,4 +1,4 @@
-package com.mengsea.khmercodepathbackend.config;
+package com.mengsea.khmercodepathbackend.config.AI;
 
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.memory.InMemoryChatMemoryRepository;

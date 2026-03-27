@@ -1,4 +1,4 @@
-package com.mengsea.khmercodepathbackend.services;
+package com.mengsea.khmercodepathbackend.services.ai;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.chat.client.ChatClient;

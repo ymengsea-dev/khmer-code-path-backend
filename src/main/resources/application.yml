@@ -1,5 +1,5 @@
 server:
-  port: 8081
+  port: 8080
 
 spring:
   application:
@@ -16,10 +16,23 @@ spring:
     hibernate:
       ddl-auto: update
     show-sql: true
+
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID}
+            client-secret: ${GOOGLE_CLIENT_SECRET}
+            scope:
+              - email
+              - profile
+
   servlet:
     multipart:
       max-file-size: 5MB
       max-request-size: 5MB
+
   data:
     redis:
       host: ${REDIS_HOSTNAME}
@@ -62,4 +75,4 @@ minio:
   url: ${MINIO_URL}
   access-key: ${MINIO_ACCESS_KEY}
   secret-key: ${MINIO_SECRET_KEY}
-  buket-name: ${MINIO_BUKET_NAME}
+  bucket-name: ${MINIO_BUCKET_NAME}
