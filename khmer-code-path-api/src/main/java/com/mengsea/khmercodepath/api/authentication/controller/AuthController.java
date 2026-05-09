@@ -1,0 +1,130 @@
+package com.mengsea.khmercodepath.api.authentication.controller;
+
+import com.mengsea.khmercodepath.api.authentication.payload.AuthResponse;
+import com.mengsea.khmercodepath.api.authentication.payload.LoginRequest;
+import com.mengsea.khmercodepath.api.authentication.payload.PasswordResetConfirmRequest;
+import com.mengsea.khmercodepath.api.authentication.payload.PasswordResetRequest;
+import com.mengsea.khmercodepath.api.authentication.payload.RegisterRequest;
+import com.mengsea.khmercodepath.api.authentication.payload.UserResponse;
+import com.mengsea.khmercodepath.api.authentication.service.UserService;
+import com.mengsea.khmercodepath.commons.api.ApiResponse;
+import com.mengsea.khmercodepath.commons.api.ApiResponses;
+import com.mengsea.khmercodepath.commons.constant.LmsStatusCode;
+import io.swagger.v3.oas.annotations.Operation;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.io.IOException;
+import java.util.Arrays;
+
+@RestController
+@RequiredArgsConstructor
+@RequestMapping("/api/v1/auth")
+public class AuthController {
+
+    private final UserService userService;
+
+    @Operation(summary = "Register User")
+    @PostMapping("/register")
+    public ResponseEntity<ApiResponse<Void>> register(@Valid @RequestBody RegisterRequest registerRequest) {
+        userService.register(registerRequest.getUsername(), registerRequest.getEmail(), registerRequest.getPassword());
+        ApiResponse<Void> body = ApiResponses.of("AUTH-0090", LmsStatusCode.CREATED, null, null);
+        return ResponseEntity.status(HttpStatus.CREATED).body(body);
+    }
+
+    @Operation(summary = "Login")
+    @PostMapping("/login")
+    public ResponseEntity<ApiResponse<AuthResponse>> login(@Valid @RequestBody LoginRequest loginRequest, HttpServletResponse response) {
+        AuthResponse authResponse = userService.login(loginRequest.getEmail(), loginRequest.getPassword());
+        addRefreshCookie(response, authResponse.getRefreshToken());
+        ApiResponse<AuthResponse> body = ApiResponses.of("AUTH-0100", LmsStatusCode.SUCCESS, null, authResponse);
+        return ResponseEntity.ok(body);
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<ApiResponse<AuthResponse>> refresh(HttpServletRequest request) {
+        String refreshToken = getRefreshToken(request);
+        AuthResponse authResponse = userService.refresh(refreshToken);
+        ApiResponse<AuthResponse> body = ApiResponses.of("AUTH-0110", LmsStatusCode.SUCCESS, null, authResponse);
+        return ResponseEntity.ok(body);
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<ApiResponse<Void>> logout(HttpServletRequest request, HttpServletResponse response) {
+        userService.logout(getRefreshToken(request));
+        clearRefreshCookie(response);
+        ApiResponse<Void> body = ApiResponses.of("AUTH-0120", LmsStatusCode.SUCCESS, null, null);
+        return ResponseEntity.ok(body);
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<ApiResponse<UserResponse>> me(Authentication authentication) {
+        UserResponse me = userService.me(authentication.getName());
+        ApiResponse<UserResponse> body = ApiResponses.of("AUTH-0130", LmsStatusCode.SUCCESS, null, me);
+        return ResponseEntity.ok(body);
+    }
+
+    @PostMapping("/password-reset/request")
+    public ResponseEntity<ApiResponse<Void>> passwordResetRequest(@Valid @RequestBody PasswordResetRequest request) {
+        userService.requestPasswordReset(request.getEmail());
+        ApiResponse<Void> body = ApiResponses.of("AUTH-0140", LmsStatusCode.SUCCESS, null, null);
+        return ResponseEntity.ok(body);
+    }
+
+    @PostMapping("/password-reset/confirm")
+    public ResponseEntity<ApiResponse<Void>> passwordResetConfirm(@Valid @RequestBody PasswordResetConfirmRequest request) {
+        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
+            ApiResponse<Void> body = ApiResponses.of("AUTH-0150", LmsStatusCode.VALIDATION_FAILED, "confirmPassword does not match newPassword", null);
+            return ResponseEntity.unprocessableEntity().body(body);
+        }
+        userService.confirmPasswordReset(request.getToken(), request.getNewPassword());
+        ApiResponse<Void> body = ApiResponses.of("AUTH-0150", LmsStatusCode.SUCCESS, null, null);
+        return ResponseEntity.ok(body);
+    }
+
+    @Operation(summary = "Login with google")
+    @GetMapping("/google")
+    public void redirectToGoogle(HttpServletResponse response) throws IOException {
+        response.sendRedirect("/oauth2/authorization/google");
+    }
+
+    private void addRefreshCookie(HttpServletResponse response, String token) {
+        Cookie cookie = new Cookie("ailms_refresh_token", token);
+        cookie.setHttpOnly(true);
+        cookie.setSecure(false);
+        cookie.setPath("/");
+        cookie.setMaxAge(7 * 24 * 60 * 60);
+        response.addCookie(cookie);
+    }
+
+    private void clearRefreshCookie(HttpServletResponse response) {
+        Cookie cookie = new Cookie("ailms_refresh_token", "");
+        cookie.setHttpOnly(true);
+        cookie.setSecure(false);
+        cookie.setPath("/");
+        cookie.setMaxAge(0);
+        response.addCookie(cookie);
+    }
+
+    private String getRefreshToken(HttpServletRequest request) {
+        if (request.getCookies() == null) {
+            return null;
+        }
+        return Arrays.stream(request.getCookies())
+                .filter(c -> "ailms_refresh_token".equals(c.getName()))
+                .map(Cookie::getValue)
+                .findFirst()
+                .orElse(null);
+    }
+}
