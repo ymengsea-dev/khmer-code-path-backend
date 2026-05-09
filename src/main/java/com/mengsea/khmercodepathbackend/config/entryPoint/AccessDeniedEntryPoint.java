@@ -1,5 +1,9 @@
 package com.mengsea.khmercodepathbackend.config.entryPoint;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mengsea.khmercodepathbackend.constant.LmsStatusCode;
+import com.mengsea.khmercodepathbackend.dto.advices.ApiResponse;
+import com.mengsea.khmercodepathbackend.dto.advices.ApiResponses;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -11,8 +15,13 @@ import java.io.IOException;
 
 @Component
 public class AccessDeniedEntryPoint implements AccessDeniedHandler {
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
     @Override
     public void handle(HttpServletRequest request, HttpServletResponse response, AccessDeniedException accessDeniedException) throws IOException, ServletException {
-
+        ApiResponse<Void> body = ApiResponses.of("SYS-2003", LmsStatusCode.FORBIDDEN, accessDeniedException.getMessage(), null);
+        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+        response.setContentType("application/json");
+        response.getWriter().write(objectMapper.writeValueAsString(body));
     }
 }

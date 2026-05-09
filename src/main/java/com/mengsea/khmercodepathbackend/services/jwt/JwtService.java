@@ -24,8 +24,19 @@ public class JwtService {
     @Value("${jwt.expiration}")
     private Integer  expiration;
 
+    @Value("${jwt.refresh-expiration}")
+    private Integer refreshExpiration;
+
     // generate token
     public String generateToken(UserDetails userDetails){
+        return generateTokenWithExpiry(userDetails, expiration);
+    }
+
+    public String generateRefreshToken(UserDetails userDetails) {
+        return generateTokenWithExpiry(userDetails, refreshExpiration);
+    }
+
+    private String generateTokenWithExpiry(UserDetails userDetails, Integer ttlSeconds) {
         Map<String, Object> claims = new HashMap<>();
 
         claims.put("roles", userDetails.getAuthorities()
@@ -35,7 +46,7 @@ public class JwtService {
         );
 
         Date issuedAt = new Date(); // now
-        Date expireAt = new Date(issuedAt.getTime() + expiration * 1000); // expiration in second but date work in millisecond
+        Date expireAt = new Date(issuedAt.getTime() + ttlSeconds * 1000); // expiration in second but date work in millisecond
 
         return Jwts.builder()
                 .setClaims(claims)

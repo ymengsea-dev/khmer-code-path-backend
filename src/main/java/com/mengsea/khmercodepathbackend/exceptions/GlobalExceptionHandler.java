@@ -1,7 +1,7 @@
 package com.mengsea.khmercodepathbackend.exceptions;
 
 import com.mengsea.khmercodepathbackend.dto.advices.ApiResponse;
-import com.mengsea.khmercodepathbackend.dto.advices.ApiStatus;
+import com.mengsea.khmercodepathbackend.dto.advices.ApiResponses;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -16,24 +16,12 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    /**
-     * Handles all business / domain exceptions (wrong credentials, user not found, etc.)
-     */
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiResponse<Void>> handleBusinessException(BusinessException ex) {
-        ApiResponse<Void> body = ApiResponse.<Void>builder()
-                .status(ApiStatus.builder()
-                        .code(String.valueOf(ex.getExceptionCode().getCode()))
-                        .message(ex.getExceptionCode().getMessage())
-                        .build())
-                .data(null)
-                .build();
-        return ResponseEntity.status(ex.getExceptionCode().getCode()).body(body);
+        ApiResponse<Void> body = ApiResponses.of("SYS-0000", ex.getExceptionCode().getStatusCode(), ex.getMessage(), null);
+        return ResponseEntity.status(ex.getExceptionCode().getHttpStatus()).body(body);
     }
 
-    /**
-     * Handles @Valid / @Validated bean-validation failures (blank email, missing fields, etc.)
-     */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<Map<String, String>>> handleValidationException(
             MethodArgumentNotValidException ex) {
@@ -43,43 +31,34 @@ public class GlobalExceptionHandler {
             String message = error.getDefaultMessage();
             errors.put(field, message);
         });
-        ApiResponse<Map<String, String>> body = ApiResponse.<Map<String, String>>builder()
-                .status(ApiStatus.builder()
-                        .code(String.valueOf(HttpStatus.BAD_REQUEST.value()))
-                        .message("Validation failed")
-                        .build())
-                .data(errors)
-                .build();
-        return ResponseEntity.badRequest().body(body);
+        ApiResponse<Map<String, String>> body = ApiResponses.of(
+                "SYS-1001",
+                com.mengsea.khmercodepathbackend.constant.LmsStatusCode.VALIDATION_FAILED,
+                "Validation failed",
+                errors
+        );
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(body);
     }
 
-    /**
-     * Handles Spring Security bad credentials (wrong password via authenticationManager).
-     */
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<ApiResponse<Void>> handleBadCredentials(BadCredentialsException ex) {
-        ApiResponse<Void> body = ApiResponse.<Void>builder()
-                .status(ApiStatus.builder()
-                        .code("401")
-                        .message("Invalid email or password.")
-                        .build())
-                .data(null)
-                .build();
+        ApiResponse<Void> body = ApiResponses.of(
+                "SYS-2000",
+                com.mengsea.khmercodepathbackend.constant.LmsStatusCode.UNAUTHORIZED,
+                "Invalid email or password",
+                null
+        );
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(body);
     }
 
-    /**
-     * Catch-all for any unexpected exception so the client always gets a JSON response.
-     */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleGenericException(Exception ex) {
-        ApiResponse<Void> body = ApiResponse.<Void>builder()
-                .status(ApiStatus.builder()
-                        .code("500")
-                        .message("An unexpected error occurred: " + ex.getMessage())
-                        .build())
-                .data(null)
-                .build();
+        ApiResponse<Void> body = ApiResponses.of(
+                "SYS-9999",
+                com.mengsea.khmercodepathbackend.constant.LmsStatusCode.INTERNAL_SERVER_ERROR,
+                ex.getMessage(),
+                null
+        );
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
     }
 }

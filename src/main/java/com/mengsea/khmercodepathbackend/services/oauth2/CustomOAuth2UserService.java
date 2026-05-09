@@ -40,7 +40,7 @@ public class CustomOAuth2UserService implements OAuth2UserService {
         user.setUsername(name);
         user.setPassword(null);
         user.setEmail(email);
-        user.setRole(Role.USER);
+        user.setRole(Role.STUDENT);
         user.setProvider(Provider.GOOGLE);
 
         return userRepository.save(user);

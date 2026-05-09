@@ -10,4 +10,5 @@ import lombok.Data;
 public class ApiResponse<T> {
     private ApiStatus status;
     private T data;
+    private ApiCommon common;
 }
