@@ -1,0 +1,46 @@
+spring:
+  flyway:
+    baseline-on-migrate: true
+    baseline-version: 0
+  datasource:
+    url: jdbc:postgresql://localhost:5433/khmercodepathdb
+    username: postgres
+    password: password
+  data:
+    redis:
+      host: localhost
+      port: 6379
+  cache:
+    type: redis
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID:000000000000-000000000000000000000.apps.googleusercontent.com}
+            client-secret: ${GOOGLE_CLIENT_SECRET:GOCSPX-not-a-real-secret}
+  ai:
+    google:
+      genai:
+        api-key: ${GOOGLE_AI_API_KEY:dev-google-ai-key-placeholder}
+        chat:
+          options:
+            model: ${GOOGLE_AI_MODEL:gemini-2.0-flash}
+        embedding:
+          api-key: ${GOOGLE_AI_API_KEY:dev-google-ai-key-placeholder}
+          text:
+            options:
+              model: ${OPTION_MODEL:text-embedding-004}
+              dimensions: 768
+
+jwt:
+  secret: ${JWT_SECRET:YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY3ODkwMTIzNA==}
+  # Plain seconds (3600) or duration strings (1h, 15m, 7d, PT1H) — see TOKEN_EXPIRATION in .env.example
+  expiration: ${TOKEN_EXPIRATION:1h}
+  refresh-expiration: ${REFRESH_TOKEN_EXPIRATION:7d}
+
+minio:
+  url: ${MINIO_URL:http://127.0.0.1:9000}
+  access-key: ${MINIO_ACCESS_KEY:minioadmin}
+  secret-key: ${MINIO_SECRET_KEY:minioadmin123}
+  bucket-name: ${MINIO_BUCKET_NAME:khmer-code-path}

@@ -6,11 +6,13 @@ import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.convert.DurationStyle;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
 import java.security.Key;
+import java.time.Duration;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -18,14 +20,44 @@ import java.util.Map;
 @Service
 public class JwtService {
 
-    @Value("${jwt.secret}")
-    private String secret;
+    private final String secret;
+    private final Duration expiration;
+    private final Duration refreshExpiration;
 
-    @Value("${jwt.expiration}")
-    private Integer expiration;
+    public JwtService(
+            @Value("${jwt.secret}") String secret,
+            @Value("${jwt.expiration}") String expirationSpec,
+            @Value("${jwt.refresh-expiration}") String refreshExpirationSpec
+    ) {
+        this.secret = secret;
+        this.expiration = parseDuration(expirationSpec, "jwt.expiration");
+        this.refreshExpiration = parseDuration(refreshExpirationSpec, "jwt.refresh-expiration");
+    }
 
-    @Value("${jwt.refresh-expiration}")
-    private Integer refreshExpiration;
+    /**
+     * Accepts plain seconds (e.g. {@code 3600}) or Spring Boot duration strings
+     * (e.g. {@code 1h}, {@code 15m}, {@code 7d}, {@code PT1H}).
+     */
+    private static Duration parseDuration(String spec, String propertyName) {
+        if (spec == null || spec.isBlank()) {
+            throw new IllegalArgumentException(propertyName + " must not be blank");
+        }
+        String s = spec.trim();
+        if (s.chars().allMatch(Character::isDigit)) {
+            return Duration.ofSeconds(Long.parseLong(s));
+        }
+        return DurationStyle.detectAndParse(s);
+    }
+
+    /** Access token TTL in whole seconds (for API {@code expiresIn}). */
+    public long getAccessTokenTtlSeconds() {
+        return expiration.toSeconds();
+    }
+
+    /** Refresh token TTL in whole seconds (e.g. cookie max-age). */
+    public long getRefreshTokenTtlSeconds() {
+        return refreshExpiration.toSeconds();
+    }
 
     public String generateToken(UserDetails userDetails) {
         return generateTokenWithExpiry(userDetails, expiration);
@@ -35,7 +67,7 @@ public class JwtService {
         return generateTokenWithExpiry(userDetails, refreshExpiration);
     }
 
-    private String generateTokenWithExpiry(UserDetails userDetails, Integer ttlSeconds) {
+    private String generateTokenWithExpiry(UserDetails userDetails, Duration ttl) {
         Map<String, Object> claims = new HashMap<>();
 
         claims.put("roles", userDetails.getAuthorities()
@@ -44,7 +76,7 @@ public class JwtService {
                 .toList());
 
         Date issuedAt = new Date();
-        Date expireAt = new Date(issuedAt.getTime() + ttlSeconds * 1000L);
+        Date expireAt = new Date(issuedAt.getTime() + ttl.toMillis());
 
         return Jwts.builder()
                 .setClaims(claims)

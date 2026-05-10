@@ -47,6 +47,15 @@ public class User {
     @Enumerated(EnumType.STRING)
     private Provider provider;
 
+    @Column(name = "student_id", unique = true)
+    private String studentId;
+
+    @Column(name = "teacher_id", unique = true)
+    private String teacherId;
+
+    @Column(nullable = false)
+    private boolean deleted = false;
+
     @CreationTimestamp
     private LocalDateTime createdAt;
 

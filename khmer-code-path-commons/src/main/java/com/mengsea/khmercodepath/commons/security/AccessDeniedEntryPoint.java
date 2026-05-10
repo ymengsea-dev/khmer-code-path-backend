@@ -19,7 +19,12 @@ public class AccessDeniedEntryPoint implements AccessDeniedHandler {
 
     @Override
     public void handle(HttpServletRequest request, HttpServletResponse response, AccessDeniedException accessDeniedException) throws IOException, ServletException {
-        ApiResponse<Void> body = ApiResponses.of("SYS-2003", LmsStatusCode.FORBIDDEN, accessDeniedException.getMessage(), null);
+        ApiResponse<Void> body = ApiResponses.of(
+                "SYS-2003",
+                LmsStatusCode.FORBIDDEN,
+                "Insufficient role or scope",
+                null
+        );
         response.setStatus(HttpServletResponse.SC_FORBIDDEN);
         response.setContentType("application/json");
         response.getWriter().write(objectMapper.writeValueAsString(body));

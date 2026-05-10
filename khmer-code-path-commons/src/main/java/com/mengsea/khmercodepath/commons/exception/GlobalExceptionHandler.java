@@ -3,8 +3,11 @@ package com.mengsea.khmercodepath.commons.exception;
 import com.mengsea.khmercodepath.commons.api.ApiResponse;
 import com.mengsea.khmercodepath.commons.api.ApiResponses;
 import com.mengsea.khmercodepath.commons.constant.LmsStatusCode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -16,6 +19,24 @@ import java.util.Map;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    /**
+     * {@link AccessDeniedException} from {@code @PreAuthorize} / method security runs inside MVC and
+     * never reaches {@link org.springframework.security.web.access.AccessDeniedHandler}; without
+     * this mapping it incorrectly falls through to {@link #handleGenericException}.
+     */
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAccessDenied(AccessDeniedException ex) {
+        ApiResponse<Void> body = ApiResponses.of(
+                "SYS-2003",
+                LmsStatusCode.FORBIDDEN,
+                "Insufficient role or scope",
+                null
+        );
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
+    }
 
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiResponse<Void>> handleBusinessException(BusinessException ex) {
@@ -54,10 +75,11 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleGenericException(Exception ex) {
+        log.error("Unhandled exception", ex);
         ApiResponse<Void> body = ApiResponses.of(
                 "SYS-9999",
                 LmsStatusCode.INTERNAL_SERVER_ERROR,
-                ex.getMessage(),
+                null,
                 null
         );
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);

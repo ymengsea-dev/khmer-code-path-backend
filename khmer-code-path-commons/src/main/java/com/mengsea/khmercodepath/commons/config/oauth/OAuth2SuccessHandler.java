@@ -43,7 +43,8 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
         cookie.setHttpOnly(true);
         cookie.setSecure(false);
         cookie.setPath("/");
-        cookie.setMaxAge(7 * 24 * 60 * 60);
+        int maxAge = (int) Math.min(Integer.MAX_VALUE, jwtService.getRefreshTokenTtlSeconds());
+        cookie.setMaxAge(maxAge);
         response.addCookie(cookie);
     }
 }

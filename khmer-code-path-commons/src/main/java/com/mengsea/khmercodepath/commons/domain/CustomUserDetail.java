@@ -1,12 +1,11 @@
 package com.mengsea.khmercodepath.commons.domain;
 
+import com.mengsea.khmercodepath.commons.security.LmsAuthorities;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import java.util.Collection;
-import java.util.List;
 
 @RequiredArgsConstructor
 public class CustomUserDetail implements UserDetails {
@@ -19,7 +18,7 @@ public class CustomUserDetail implements UserDetails {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().name().toUpperCase()));
+        return LmsAuthorities.forUser(user);
     }
 
     @Override
@@ -30,5 +29,10 @@ public class CustomUserDetail implements UserDetails {
     @Override
     public String getUsername() {
         return user.getEmail();
+    }
+
+    @Override
+    public boolean isEnabled() {
+        return user.isActive() && !user.isDeleted();
     }
 }

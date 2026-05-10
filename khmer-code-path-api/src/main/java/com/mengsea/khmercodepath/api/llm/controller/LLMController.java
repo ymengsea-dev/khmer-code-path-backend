@@ -4,9 +4,13 @@ import com.mengsea.khmercodepath.api.llm.service.ChatService;
 import com.mengsea.khmercodepath.api.llm.service.RAGService;
 import com.mengsea.khmercodepath.commons.api.ApiResponse;
 import com.mengsea.khmercodepath.commons.api.ApiResponses;
+import com.mengsea.khmercodepath.commons.config.SwaggerConfig;
+import com.mengsea.khmercodepath.commons.constant.LmsAuthority;
 import com.mengsea.khmercodepath.commons.constant.LmsStatusCode;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -17,6 +21,8 @@ import reactor.core.publisher.Flux;
 @RestController
 @RequestMapping("/api/v1/ai")
 @RequiredArgsConstructor
+@SecurityRequirement(name = SwaggerConfig.SECURITY_SCHEME_NAME)
+@PreAuthorize("hasAuthority('" + LmsAuthority.AI_CHAT + "')")
 public class LLMController {
 
     private final ChatService chatService;
@@ -33,6 +39,7 @@ public class LLMController {
     }
 
     @PostMapping("/rag/ingest")
+    @PreAuthorize("hasAuthority('" + LmsAuthority.AI_INGEST + "')")
     public ApiResponse<String> ingest() throws Exception {
         ragService.ingestDocument();
         return ApiResponses.of("LSN-0450", LmsStatusCode.SUCCESS, null, "Document ingest successfully.");

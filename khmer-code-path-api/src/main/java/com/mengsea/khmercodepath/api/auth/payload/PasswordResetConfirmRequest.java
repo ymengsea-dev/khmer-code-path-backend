@@ -1,0 +1,16 @@
+package com.mengsea.khmercodepath.api.auth.payload;
+
+import jakarta.validation.constraints.NotBlank;
+import lombok.Data;
+
+@Data
+public class PasswordResetConfirmRequest {
+    @NotBlank
+    private String token;
+
+    @NotBlank
+    private String newPassword;
+
+    @NotBlank
+    private String confirmPassword;
+}

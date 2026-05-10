@@ -30,9 +30,22 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
             throw new OAuth2AuthenticationException("Email not found");
         }
         User user = userRepository.findByEmail(email)
+                .map(u -> reactivateIfDeleted(u, name))
                 .orElseGet(() -> createGoogleUser(email, name));
 
         return new CustomOauthUser(user, oAuth2User.getAttributes());
+    }
+
+    private User reactivateIfDeleted(User user, String name) {
+        if (user.isDeleted()) {
+            user.setDeleted(false);
+            user.setActive(true);
+            if (name != null && !name.isBlank()) {
+                user.setUsername(name);
+            }
+            return userRepository.save(user);
+        }
+        return user;
     }
 
     private User createGoogleUser(String email, String name) {
@@ -42,6 +55,7 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
         user.setEmail(email);
         user.setRole(Role.STUDENT);
         user.setProvider(Provider.GOOGLE);
+        user.setDeleted(false);
 
         return userRepository.save(user);
     }
