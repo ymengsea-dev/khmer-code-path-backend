@@ -1,6 +1,9 @@
 server:
   port: 8080
 
+app:
+  frontend-url: ${FRONTEND_URL:http://localhost:3000}
+
 spring:
   application:
     name: khmer-code-path-backend
@@ -75,6 +78,9 @@ jwt:
   secret: ${JWT_SECRET}
   expiration: ${TOKEN_EXPIRATION}
   refresh-expiration: ${REFRESH_TOKEN_EXPIRATION}
+
+lms:
+  uploads-dir: ${LMS_UPLOADS_DIR:./uploads}
 
 minio:
   url: ${MINIO_URL}

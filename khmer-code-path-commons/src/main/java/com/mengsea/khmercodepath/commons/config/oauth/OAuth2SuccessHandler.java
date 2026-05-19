@@ -8,6 +8,7 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
@@ -21,6 +22,9 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
 
     private final JwtService jwtService;
 
+    @Value("${app.frontend-url:http://localhost:3000}")
+    private String frontendUrl;
+
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response, Authentication authentication) throws IOException, ServletException {
         CustomOauthUser oauthUser = (CustomOauthUser) authentication.getPrincipal();
@@ -31,9 +35,16 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
 
         addRefreshCookie(response, refreshToken);
 
-        String targetUrl = UriComponentsBuilder.fromUriString("http://localhost:3000/login")
+        UriComponentsBuilder redirectBuilder = UriComponentsBuilder
+                .fromUriString(frontendUrl + "/api/auth/oauth/callback")
                 .queryParam("token", accessToken)
-                .build().toUriString();
+                .queryParam("expiresIn", jwtService.getAccessTokenTtlSeconds());
+
+        if (refreshToken != null && !refreshToken.isBlank()) {
+            redirectBuilder.queryParam("refresh", refreshToken);
+        }
+
+        String targetUrl = redirectBuilder.encode().build().toUriString();
 
         getRedirectStrategy().sendRedirect(request, response, targetUrl);
     }

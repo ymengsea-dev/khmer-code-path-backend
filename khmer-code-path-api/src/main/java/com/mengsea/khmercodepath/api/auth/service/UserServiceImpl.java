@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -34,6 +35,8 @@ public class UserServiceImpl implements UserService {
     private final JwtService jwtService;
     private final UserMapper userMapper;
 
+    /** Explicitly revoked refresh tokens (logout). Valid JWTs refresh even if not in {@link #refreshTokenStore}. */
+    private final Set<String> revokedRefreshTokens = ConcurrentHashMap.newKeySet();
     private final Map<String, String> refreshTokenStore = new ConcurrentHashMap<>();
     private final Map<String, PasswordResetPayload> passwordResetStore = new ConcurrentHashMap<>();
 
@@ -91,17 +94,30 @@ public class UserServiceImpl implements UserService {
         if (refreshToken == null || refreshToken.isBlank()) {
             throw new BusinessException(ExceptionCode.REFRESH_TOKEN_NOT_FOUND);
         }
-        if (!refreshTokenStore.containsKey(refreshToken)) {
+        if (revokedRefreshTokens.contains(refreshToken)) {
             throw new BusinessException(ExceptionCode.REFRESH_TOKEN_REVOKED);
         }
+        if (jwtService.isExpiration(refreshToken)) {
+            revokedRefreshTokens.add(refreshToken);
+            refreshTokenStore.remove(refreshToken);
+            throw new BusinessException(ExceptionCode.REFRESH_TOKEN_EXPIRED);
+        }
+
         String email = jwtService.extractUsername(refreshToken);
         User user = userRepository.findByEmailAndDeletedFalse(email)
                 .orElseThrow(() -> new BusinessException(ExceptionCode.USER_NOT_FOUND));
 
         CustomUserDetail userDetails = new CustomUserDetail(user);
+        if (!jwtService.isTokenValid(refreshToken, userDetails)) {
+            throw new BusinessException(ExceptionCode.REFRESH_TOKEN_REVOKED);
+        }
+
+        refreshTokenStore.putIfAbsent(refreshToken, email);
+
         String newAccessToken = jwtService.generateToken(userDetails);
         return AuthResponse.builder()
                 .accessToken(newAccessToken)
+                .refreshToken(refreshToken)
                 .tokenType("Bearer")
                 .expiresIn(jwtService.getAccessTokenTtlSeconds())
                 .user(userMapper.toResponse(user))
@@ -111,6 +127,7 @@ public class UserServiceImpl implements UserService {
     @Override
     public void logout(String refreshToken) {
         if (refreshToken != null && !refreshToken.isBlank()) {
+            revokedRefreshTokens.add(refreshToken);
             refreshTokenStore.remove(refreshToken);
         }
     }

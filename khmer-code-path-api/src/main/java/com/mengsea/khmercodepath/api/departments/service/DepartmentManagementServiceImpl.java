@@ -1,0 +1,149 @@
+package com.mengsea.khmercodepath.api.departments.service;
+
+import com.mengsea.khmercodepath.api.departments.payload.CreateDepartmentRequest;
+import com.mengsea.khmercodepath.api.departments.payload.DepartmentDetailPayload;
+import com.mengsea.khmercodepath.api.departments.payload.DepartmentSummaryPayload;
+import com.mengsea.khmercodepath.api.departments.payload.UpdateDepartmentRequest;
+import com.mengsea.khmercodepath.commons.constant.DepartmentAccent;
+import com.mengsea.khmercodepath.commons.constant.DepartmentStatus;
+import com.mengsea.khmercodepath.commons.constant.ExceptionCode;
+import com.mengsea.khmercodepath.commons.constant.Role;
+import com.mengsea.khmercodepath.commons.domain.Department;
+import com.mengsea.khmercodepath.commons.domain.User;
+import com.mengsea.khmercodepath.commons.exception.BusinessException;
+import com.mengsea.khmercodepath.commons.repository.DepartmentRepository;
+import com.mengsea.khmercodepath.commons.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Collections;
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+public class DepartmentManagementServiceImpl implements DepartmentManagementService {
+
+    private final DepartmentRepository departmentRepository;
+    private final UserRepository userRepository;
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<DepartmentSummaryPayload> listDepartments() {
+        return departmentRepository.findByDeletedFalseOrderByNameAsc().stream()
+                .map(this::toSummary)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public DepartmentDetailPayload getDepartment(Long id) {
+        Department dept = requireDepartment(id);
+        return DepartmentDetailPayload.builder()
+                .department(toSummary(dept))
+                .assignedTeachers(listTeachersForDepartment(dept))
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public DepartmentSummaryPayload createDepartment(CreateDepartmentRequest request) {
+        Department entity = new Department();
+        applyCreate(entity, request);
+        entity.setDeleted(false);
+        departmentRepository.save(entity);
+        return toSummary(entity);
+    }
+
+    @Override
+    @Transactional
+    public DepartmentSummaryPayload updateDepartment(Long id, UpdateDepartmentRequest request) {
+        Department entity = requireDepartment(id);
+        if (request.getName() != null) {
+            entity.setName(request.getName().trim());
+        }
+        if (request.getFaculty() != null) {
+            entity.setFaculty(blankToNull(request.getFaculty()));
+        }
+        if (request.getHeadOfDept() != null) {
+            entity.setHeadOfDept(blankToNull(request.getHeadOfDept()));
+        }
+        if (request.getHodId() != null) {
+            entity.setHodUser(resolveHodUser(request.getHodId()));
+        }
+        if (request.getFacultyCount() != null) {
+            entity.setFacultyCount(request.getFacultyCount());
+        }
+        if (request.getCapacityPercent() != null) {
+            entity.setCapacityPercent(request.getCapacityPercent());
+        }
+        if (request.getStatus() != null) {
+            entity.setStatus(request.getStatus());
+        }
+        if (request.getAccent() != null) {
+            entity.setAccent(request.getAccent());
+        }
+        departmentRepository.save(entity);
+        return toSummary(entity);
+    }
+
+    private Department requireDepartment(Long id) {
+        return departmentRepository.findByIdAndDeletedFalse(id)
+                .orElseThrow(() -> new BusinessException(ExceptionCode.DEPARTMENT_NOT_FOUND));
+    }
+
+    private void applyCreate(Department entity, CreateDepartmentRequest request) {
+        entity.setName(request.getName().trim());
+        entity.setFaculty(blankToNull(request.getFaculty()));
+        entity.setHeadOfDept(blankToNull(request.getHeadOfDept()));
+        entity.setHodUser(resolveHodUser(request.getHodId()));
+        entity.setFacultyCount(request.getFacultyCount() != null ? request.getFacultyCount() : 0);
+        entity.setCapacityPercent(
+                request.getCapacityPercent() != null ? request.getCapacityPercent() : 50
+        );
+        entity.setStatus(request.getStatus() != null ? request.getStatus() : DepartmentStatus.ACTIVE);
+        entity.setAccent(request.getAccent() != null ? request.getAccent() : DepartmentAccent.VIOLET);
+    }
+
+    private User resolveHodUser(String hodId) {
+        if (hodId == null || hodId.isBlank()) {
+            return null;
+        }
+        return userRepository.findByUuidAndDeletedFalse(hodId.trim()).orElse(null);
+    }
+
+    private List<String> listTeachersForDepartment(Department dept) {
+        int limit = Math.max(0, dept.getFacultyCount());
+        if (limit == 0) {
+            return Collections.emptyList();
+        }
+        return userRepository.findByRoleAndDeletedFalseOrderByUsernameAsc(Role.TEACHER).stream()
+                .limit(limit)
+                .map(User::getUsername)
+                .toList();
+    }
+
+    private DepartmentSummaryPayload toSummary(Department dept) {
+        String head = dept.getHeadOfDept();
+        if ((head == null || head.isBlank()) && dept.getHodUser() != null) {
+            head = dept.getHodUser().getUsername();
+        }
+        return DepartmentSummaryPayload.builder()
+                .id(dept.getId())
+                .name(dept.getName())
+                .faculty(dept.getFaculty())
+                .headOfDept(head != null ? head : "—")
+                .facultyCount(dept.getFacultyCount())
+                .capacityPercent(dept.getCapacityPercent())
+                .status(dept.getStatus())
+                .accent(dept.getAccent())
+                .build();
+    }
+
+    private static String blankToNull(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
+    }
+}

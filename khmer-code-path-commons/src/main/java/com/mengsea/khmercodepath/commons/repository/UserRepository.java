@@ -1,5 +1,6 @@
 package com.mengsea.khmercodepath.commons.repository;
 
+import com.mengsea.khmercodepath.commons.constant.Role;
 import com.mengsea.khmercodepath.commons.domain.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
@@ -27,4 +28,8 @@ public interface UserRepository extends JpaRepository<User, String>, JpaSpecific
     boolean existsByTeacherIdAndDeletedFalseAndUuidNot(String teacherId, String uuid);
 
     List<User> findAllByUuidInAndDeletedFalse(Collection<String> uuids);
+
+    long countByRoleAndDeletedFalse(Role role);
+
+    List<User> findByRoleAndDeletedFalseOrderByUsernameAsc(Role role);
 }

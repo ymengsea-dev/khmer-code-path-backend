@@ -4,6 +4,7 @@ import com.mengsea.khmercodepath.api.auth.payload.AuthResponse;
 import com.mengsea.khmercodepath.api.auth.payload.LoginRequest;
 import com.mengsea.khmercodepath.api.auth.payload.PasswordResetConfirmRequest;
 import com.mengsea.khmercodepath.api.auth.payload.PasswordResetRequest;
+import com.mengsea.khmercodepath.api.auth.payload.RefreshTokenRequest;
 import com.mengsea.khmercodepath.api.auth.payload.RegisterRequest;
 import com.mengsea.khmercodepath.api.auth.payload.UserResponse;
 import com.mengsea.khmercodepath.api.auth.service.UserService;
@@ -57,12 +58,21 @@ public class AuthController {
         return ResponseEntity.ok(body);
     }
 
+    @Operation(summary = "AUTH-0110 · Refresh access token")
     @PostMapping("/refresh")
-    public ResponseEntity<ApiResponse<AuthResponse>> refresh(HttpServletRequest request) {
-        String refreshToken = getRefreshToken(request);
+    public ResponseEntity<ApiResponse<AuthResponse>> refresh(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            @RequestBody(required = false) RefreshTokenRequest refreshRequest
+    ) {
+        String refreshToken = resolveRefreshToken(request, refreshRequest);
         AuthResponse authResponse = userService.refresh(refreshToken);
-        ApiResponse<AuthResponse> body = ApiResponses.of("AUTH-0110", LmsStatusCode.SUCCESS, null, authResponse);
-        return ResponseEntity.ok(body);
+        if (authResponse.getRefreshToken() != null && !authResponse.getRefreshToken().isBlank()) {
+            addRefreshCookie(response, authResponse.getRefreshToken());
+        }
+        ApiResponse<AuthResponse> apiBody =
+                ApiResponses.of("AUTH-0110", LmsStatusCode.SUCCESS, null, authResponse);
+        return ResponseEntity.ok(apiBody);
     }
 
     @PostMapping("/logout")
@@ -133,5 +143,18 @@ public class AuthController {
                 .map(Cookie::getValue)
                 .findFirst()
                 .orElse(null);
+    }
+
+    private String resolveRefreshToken(HttpServletRequest request, RefreshTokenRequest refreshRequest) {
+        String fromCookie = getRefreshToken(request);
+        if (fromCookie != null && !fromCookie.isBlank()) {
+            return fromCookie;
+        }
+        if (refreshRequest != null
+                && refreshRequest.getRefreshToken() != null
+                && !refreshRequest.getRefreshToken().isBlank()) {
+            return refreshRequest.getRefreshToken().trim();
+        }
+        return null;
     }
 }

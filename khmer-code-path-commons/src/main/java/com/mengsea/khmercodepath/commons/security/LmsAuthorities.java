@@ -28,15 +28,36 @@ public final class LmsAuthorities {
                 authorities.add(new SimpleGrantedAuthority(LmsAuthority.USR_MANAGE));
                 authorities.add(new SimpleGrantedAuthority(LmsAuthority.CLS_READ));
                 authorities.add(new SimpleGrantedAuthority(LmsAuthority.CLS_MANAGE));
+                authorities.add(new SimpleGrantedAuthority(LmsAuthority.CRS_READ));
+                authorities.add(new SimpleGrantedAuthority(LmsAuthority.CRS_MANAGE));
+                authorities.add(new SimpleGrantedAuthority(LmsAuthority.OPS_MANAGE));
                 authorities.add(new SimpleGrantedAuthority(LmsAuthority.AI_CHAT));
                 authorities.add(new SimpleGrantedAuthority(LmsAuthority.AI_INGEST));
+                authorities.add(new SimpleGrantedAuthority(LmsAuthority.DASH_READ));
+                authorities.add(new SimpleGrantedAuthority(LmsAuthority.ATT_MANAGE));
+                authorities.add(new SimpleGrantedAuthority(LmsAuthority.GRD_MANAGE));
+                authorities.add(new SimpleGrantedAuthority(LmsAuthority.PROG_READ));
+                authorities.add(new SimpleGrantedAuthority(LmsAuthority.LSN_MANAGE));
             }
             case TEACHER -> {
                 authorities.add(new SimpleGrantedAuthority(LmsAuthority.CLS_READ));
+                authorities.add(new SimpleGrantedAuthority(LmsAuthority.CRS_READ));
+                authorities.add(new SimpleGrantedAuthority(LmsAuthority.CRS_MANAGE));
                 authorities.add(new SimpleGrantedAuthority(LmsAuthority.AI_CHAT));
                 authorities.add(new SimpleGrantedAuthority(LmsAuthority.AI_INGEST));
+                authorities.add(new SimpleGrantedAuthority(LmsAuthority.DASH_READ));
+                authorities.add(new SimpleGrantedAuthority(LmsAuthority.ATT_MANAGE));
+                authorities.add(new SimpleGrantedAuthority(LmsAuthority.GRD_MANAGE));
+                authorities.add(new SimpleGrantedAuthority(LmsAuthority.PROG_READ));
+                authorities.add(new SimpleGrantedAuthority(LmsAuthority.LSN_MANAGE));
             }
-            case STUDENT -> authorities.add(new SimpleGrantedAuthority(LmsAuthority.AI_CHAT));
+            case STUDENT -> {
+                authorities.add(new SimpleGrantedAuthority(LmsAuthority.CLS_READ));
+                authorities.add(new SimpleGrantedAuthority(LmsAuthority.CRS_READ));
+                authorities.add(new SimpleGrantedAuthority(LmsAuthority.AI_CHAT));
+                authorities.add(new SimpleGrantedAuthority(LmsAuthority.DASH_READ));
+                authorities.add(new SimpleGrantedAuthority(LmsAuthority.PROG_READ));
+            }
         }
         return authorities;
     }

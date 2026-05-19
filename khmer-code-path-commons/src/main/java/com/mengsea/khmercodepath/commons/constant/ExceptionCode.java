@@ -35,7 +35,20 @@ public enum ExceptionCode {
     CLASS_DELETE_NOT_ALLOWED(LmsStatusCode.OPERATION_NOT_ALLOWED,
             "Class can be deleted only when it has no enrolled students and no lessons"),
     TEACHER_NOT_FOUND(LmsStatusCode.BAD_REQUEST, "Teacher user not found or is not a teacher"),
-    STUDENT_NOT_FOUND(LmsStatusCode.BAD_REQUEST, "One or more student users were not found or are not students");
+    STUDENT_NOT_FOUND(LmsStatusCode.BAD_REQUEST, "One or more student users were not found or are not students"),
+    COURSE_NOT_FOUND(LmsStatusCode.NOT_FOUND, "Course not found"),
+    DEPARTMENT_NOT_FOUND(LmsStatusCode.NOT_FOUND, "Department not found"),
+    OPERATIONS_REQUEST_NOT_FOUND(LmsStatusCode.NOT_FOUND, "Faculty request not found"),
+    ATTENDANCE_NOT_FOUND(LmsStatusCode.NOT_FOUND, "Attendance record not found"),
+    GRADE_NOT_FOUND(LmsStatusCode.NOT_FOUND, "Grade not found"),
+    INVALID_SESSION_ID(LmsStatusCode.BAD_REQUEST, "Invalid attendance session id"),
+    LESSON_NOT_FOUND(LmsStatusCode.NOT_FOUND, "Lesson not found"),
+    MATERIAL_NOT_FOUND(LmsStatusCode.NOT_FOUND, "Material not found"),
+    LIBRARY_ITEM_NOT_FOUND(LmsStatusCode.NOT_FOUND, "Library item not found"),
+    NOTIFICATION_NOT_FOUND(LmsStatusCode.NOT_FOUND, "Notification not found"),
+    INVITATION_NOT_FOUND(LmsStatusCode.NOT_FOUND, "Class invitation not found"),
+    INVITATION_ALREADY_RESPONDED(LmsStatusCode.OPERATION_NOT_ALLOWED, "Invitation has already been accepted or declined"),
+    STUDENT_ALREADY_ENROLLED(LmsStatusCode.CONFLICT, "Student is already enrolled in this class");
 
     private final LmsStatusCode statusCode;
     private final String message;

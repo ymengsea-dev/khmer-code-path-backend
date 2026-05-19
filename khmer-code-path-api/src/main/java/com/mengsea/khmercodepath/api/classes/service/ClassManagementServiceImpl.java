@@ -23,6 +23,7 @@ import com.mengsea.khmercodepath.commons.repository.LessonRepository;
 import com.mengsea.khmercodepath.commons.repository.LmsClassRepository;
 import com.mengsea.khmercodepath.commons.repository.LmsClassSpecifications;
 import com.mengsea.khmercodepath.commons.repository.UserRepository;
+import com.mengsea.khmercodepath.commons.security.ClassAccessHelper;
 import com.mengsea.khmercodepath.commons.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -46,6 +47,8 @@ public class ClassManagementServiceImpl implements ClassManagementService {
     private final LessonRepository lessonRepository;
     private final UserRepository userRepository;
     private final UserAdminMapper userAdminMapper;
+    private final ClassInvitationService classInvitationService;
+    private final ClassAccessHelper classAccessHelper;
 
     @Override
     @Transactional(readOnly = true)
@@ -66,6 +69,8 @@ public class ClassManagementServiceImpl implements ClassManagementService {
 
         if (me.getRole() == Role.TEACHER) {
             spec = spec.and(LmsClassSpecifications.teacherUuidEquals(me.getUuid()));
+        } else if (me.getRole() == Role.STUDENT) {
+            spec = spec.and(LmsClassSpecifications.studentEnrolledEquals(me.getUuid()));
         } else if (me.getRole() == Role.ADMIN && teacherId != null && !teacherId.isBlank()) {
             spec = spec.and(LmsClassSpecifications.teacherUuidEquals(teacherId.trim()));
         }
@@ -165,7 +170,7 @@ public class ClassManagementServiceImpl implements ClassManagementService {
         LmsClass entity = lmsClassRepository.findByIdAndDeletedFalse(id)
                 .orElseThrow(() -> new BusinessException(ExceptionCode.CLASS_NOT_FOUND));
         long enrolled = classEnrollmentRepository.countByLmsClass_Id(id);
-        long lessons = lessonRepository.countByLmsClass_Id(id);
+        long lessons = lessonRepository.countByLmsClass_IdAndDeletedFalse(id);
         if (enrolled > 0 || lessons > 0) {
             throw new BusinessException(ExceptionCode.CLASS_DELETE_NOT_ALLOWED);
         }
@@ -176,32 +181,23 @@ public class ClassManagementServiceImpl implements ClassManagementService {
     @Override
     @Transactional
     public void assignStudents(Long id, AssignStudentsRequest request) {
-        LmsClass entity = lmsClassRepository.findByIdAndDeletedFalse(id)
-                .orElseThrow(() -> new BusinessException(ExceptionCode.CLASS_NOT_FOUND));
         Set<String> ids = new LinkedHashSet<>();
         for (String sid : request.getStudentIds()) {
             if (sid != null && !sid.isBlank()) {
                 ids.add(sid.trim());
             }
         }
-        List<User> students = loadStudents(ids);
-        for (User student : students) {
-            if (classEnrollmentRepository.existsByLmsClass_IdAndStudent_Uuid(id, student.getUuid())) {
-                continue;
-            }
-            ClassEnrollment row = new ClassEnrollment();
-            row.setLmsClass(entity);
-            row.setStudent(student);
-            classEnrollmentRepository.save(row);
-        }
+        classInvitationService.inviteStudents(id, ids);
     }
 
     @Override
     @Transactional
     public void removeStudents(Long id, RemoveStudentsRequest request) {
-        lmsClassRepository.findByIdAndDeletedFalse(id)
+        LmsClass entity = lmsClassRepository.findByIdAndDeletedFalse(id)
                 .orElseThrow(() -> new BusinessException(ExceptionCode.CLASS_NOT_FOUND));
+        classAccessHelper.assertCanManageClass(entity);
         classEnrollmentRepository.deleteByLmsClass_IdAndStudent_UuidIn(id, request.getStudentIds());
+        classInvitationService.cancelPendingInvitations(id, request.getStudentIds());
     }
 
     @Override
@@ -227,6 +223,10 @@ public class ClassManagementServiceImpl implements ClassManagementService {
             return;
         }
         if (me.getRole() == Role.TEACHER && Objects.equals(me.getUuid(), entity.getTeacher().getUuid())) {
+            return;
+        }
+        if (me.getRole() == Role.STUDENT
+                && classEnrollmentRepository.existsByLmsClass_IdAndStudent_Uuid(entity.getId(), me.getUuid())) {
             return;
         }
         throw new BusinessException(ExceptionCode.ACCESS_DENIED);
@@ -277,7 +277,7 @@ public class ClassManagementServiceImpl implements ClassManagementService {
 
     private ClassDetailPayload toDetail(LmsClass c) {
         long enrolled = classEnrollmentRepository.countByLmsClass_Id(c.getId());
-        long lessonTotal = lessonRepository.countByLmsClass_Id(c.getId());
+        long lessonTotal = lessonRepository.countByLmsClass_IdAndDeletedFalse(c.getId());
         return ClassDetailPayload.builder()
                 .id(c.getId())
                 .code(c.getCode())

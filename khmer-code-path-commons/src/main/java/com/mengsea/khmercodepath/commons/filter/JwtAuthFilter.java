@@ -25,14 +25,11 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
-        final String authHeader = request.getHeader("Authorization");
-
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        String jwt = resolveJwt(request);
+        if (jwt == null) {
             filterChain.doFilter(request, response);
             return;
         }
-
-        String jwt = authHeader.substring(7);
         String email = jwtService.extractUsername(jwt);
         if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
             UserDetails userDetails = userDetailService.loadUserByUsername(email);
@@ -52,5 +49,24 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             }
         }
         filterChain.doFilter(request, response);
+    }
+
+    /**
+     * Browser {@code EventSource} cannot send Authorization headers; SSE uses {@code ?token=}.
+     */
+    private String resolveJwt(HttpServletRequest request) {
+        final String authHeader = request.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            return authHeader.substring(7);
+        }
+        if ("GET".equalsIgnoreCase(request.getMethod())
+                && request.getRequestURI() != null
+                && request.getRequestURI().endsWith("/notifications/stream")) {
+            String token = request.getParameter("token");
+            if (token != null && !token.isBlank()) {
+                return token.trim();
+            }
+        }
+        return null;
     }
 }

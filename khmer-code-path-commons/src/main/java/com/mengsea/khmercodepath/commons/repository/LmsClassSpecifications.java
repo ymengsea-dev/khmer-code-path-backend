@@ -1,7 +1,9 @@
 package com.mengsea.khmercodepath.commons.repository;
 
 import com.mengsea.khmercodepath.commons.constant.ClassStatus;
+import com.mengsea.khmercodepath.commons.domain.ClassEnrollment;
 import com.mengsea.khmercodepath.commons.domain.LmsClass;
+import jakarta.persistence.criteria.Subquery;
 import org.springframework.data.jpa.domain.Specification;
 
 public final class LmsClassSpecifications {
@@ -49,5 +51,20 @@ public final class LmsClassSpecifications {
             return (root, query, cb) -> cb.conjunction();
         }
         return (root, query, cb) -> cb.equal(root.get("status"), status);
+    }
+
+    /** Classes where the given student user is enrolled. */
+    public static Specification<LmsClass> studentEnrolledEquals(String studentUuid) {
+        if (studentUuid == null || studentUuid.isBlank()) {
+            return (root, query, cb) -> cb.disjunction();
+        }
+        return (root, query, cb) -> {
+            Subquery<Long> subquery = query.subquery(Long.class);
+            var enrollmentRoot = subquery.from(ClassEnrollment.class);
+            subquery
+                    .select(enrollmentRoot.get("lmsClass").get("id"))
+                    .where(cb.equal(enrollmentRoot.get("student").get("uuid"), studentUuid));
+            return root.get("id").in(subquery);
+        };
     }
 }

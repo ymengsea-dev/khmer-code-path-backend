@@ -1,0 +1,27 @@
+package com.mengsea.khmercodepath.commons.repository;
+
+import com.mengsea.khmercodepath.commons.domain.QuizSubmission;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import java.util.List;
+
+public interface QuizSubmissionRepository extends JpaRepository<QuizSubmission, Long> {
+
+    @Query("""
+            SELECT COUNT(s) FROM QuizSubmission s
+            WHERE s.student.uuid = :studentUuid
+            AND s.status = 'COMPLETED'
+            """)
+    long countCompletedByStudentUuid(@Param("studentUuid") String studentUuid);
+
+    @Query("""
+            SELECT s FROM QuizSubmission s
+            JOIN FETCH s.quiz q
+            JOIN FETCH q.lmsClass c
+            WHERE s.student.uuid = :studentUuid
+            ORDER BY s.submittedAt DESC
+            """)
+    List<QuizSubmission> findByStudentUuidWithQuiz(@Param("studentUuid") String studentUuid);
+}

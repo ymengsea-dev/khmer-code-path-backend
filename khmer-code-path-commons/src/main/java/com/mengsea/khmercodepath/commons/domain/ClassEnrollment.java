@@ -44,4 +44,7 @@ public class ClassEnrollment {
     @CreationTimestamp
     @Column(name = "enrolled_at")
     private LocalDateTime enrolledAt;
+
+    @Column(name = "completed_at")
+    private LocalDateTime completedAt;
 }

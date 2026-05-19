@@ -17,4 +17,20 @@ public interface ClassEnrollmentRepository extends JpaRepository<ClassEnrollment
     void deleteByLmsClass_IdAndStudent_UuidIn(Long classId, Collection<String> studentUuids);
 
     boolean existsByLmsClass_IdAndStudent_Uuid(Long classId, String studentUuid);
+
+    boolean existsByStudent_UuidAndLmsClass_Teacher_Uuid(String studentUuid, String teacherUuid);
+
+    @EntityGraph(attributePaths = {"student", "lmsClass"})
+    List<ClassEnrollment> findByStudent_UuidOrderByEnrolledAtDesc(String studentUuid);
+
+    long countByStudent_Uuid(String studentUuid);
+
+    long countByStudent_UuidAndCompletedAtIsNotNull(String studentUuid);
+
+    @org.springframework.data.jpa.repository.Query("""
+            SELECT COUNT(DISTINCT e.student.uuid) FROM ClassEnrollment e
+            WHERE e.lmsClass.deleted = false
+            AND e.lmsClass.teacher.uuid = :teacherUuid
+            """)
+    long countStudentsByTeacherUuid(@org.springframework.data.repository.query.Param("teacherUuid") String teacherUuid);
 }

@@ -15,4 +15,11 @@ public interface LmsClassRepository extends JpaRepository<LmsClass, Long>, JpaSp
     boolean existsByCodeIgnoreCaseAndDeletedFalse(String code);
 
     boolean existsByCodeIgnoreCaseAndDeletedFalseAndIdNot(String code, Long id);
+
+    long countByDeletedFalse();
+
+    long countByTeacher_UuidAndDeletedFalseAndStatus(
+            String teacherUuid,
+            com.mengsea.khmercodepath.commons.constant.ClassStatus status
+    );
 }

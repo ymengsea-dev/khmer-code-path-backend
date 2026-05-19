@@ -1,11 +1,16 @@
 package com.mengsea.khmercodepath.api.classes.controller;
 
 import com.mengsea.khmercodepath.api.classes.payload.AssignStudentsRequest;
+import com.mengsea.khmercodepath.api.classes.payload.ClassCommentPayload;
 import com.mengsea.khmercodepath.api.classes.payload.ClassDetailPayload;
+import com.mengsea.khmercodepath.api.classes.payload.ClassInvitationPayload;
 import com.mengsea.khmercodepath.api.classes.payload.ClassPagePayload;
+import com.mengsea.khmercodepath.api.classes.payload.CreateClassCommentRequest;
 import com.mengsea.khmercodepath.api.classes.payload.CreateClassRequest;
 import com.mengsea.khmercodepath.api.classes.payload.RemoveStudentsRequest;
 import com.mengsea.khmercodepath.api.classes.payload.UpdateClassRequest;
+import com.mengsea.khmercodepath.api.classes.service.ClassCommentService;
+import com.mengsea.khmercodepath.api.classes.service.ClassInvitationService;
 import com.mengsea.khmercodepath.api.classes.service.ClassManagementService;
 import com.mengsea.khmercodepath.api.users.payload.UserDetailPayload;
 import com.mengsea.khmercodepath.commons.api.ApiResponse;
@@ -25,15 +30,7 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -45,6 +42,8 @@ import java.util.List;
 public class ClassManagementController {
 
     private final ClassManagementService classManagementService;
+    private final ClassCommentService classCommentService;
+    private final ClassInvitationService classInvitationService;
 
     @Operation(summary = "CLS-0300 · List classes")
     @GetMapping
@@ -97,9 +96,9 @@ public class ClassManagementController {
         return ResponseEntity.ok(ApiResponses.of("CLS-0340", LmsStatusCode.SUCCESS, null, null));
     }
 
-    @Operation(summary = "CLS-0350 · Assign students to class")
+    @Operation(summary = "CLS-0350 · Invite students to class (notification + accept flow)")
     @PostMapping("/{id}/students")
-    @PreAuthorize("hasAuthority('" + LmsAuthority.CLS_MANAGE + "')")
+    @PreAuthorize("hasAuthority('" + LmsAuthority.CLS_READ + "')")
     public ResponseEntity<ApiResponse<Void>> assignStudents(
             @PathVariable Long id,
             @Valid @RequestBody AssignStudentsRequest request
@@ -110,7 +109,7 @@ public class ClassManagementController {
 
     @Operation(summary = "CLS-0360 · Remove students from class")
     @DeleteMapping("/{id}/students")
-    @PreAuthorize("hasAuthority('" + LmsAuthority.CLS_MANAGE + "')")
+    @PreAuthorize("hasAuthority('" + LmsAuthority.CLS_READ + "')")
     public ResponseEntity<ApiResponse<Void>> removeStudents(
             @PathVariable Long id,
             @Valid @RequestBody RemoveStudentsRequest request
@@ -119,11 +118,69 @@ public class ClassManagementController {
         return ResponseEntity.ok(ApiResponses.of("CLS-0360", LmsStatusCode.SUCCESS, null, null));
     }
 
+    @Operation(summary = "CLS-0355 · List my pending class invitations")
+    @GetMapping("/invitations/mine")
+    @PreAuthorize("hasRole('STUDENT')")
+    public ResponseEntity<ApiResponse<List<ClassInvitationPayload>>> myInvitations() {
+        List<ClassInvitationPayload> data = classInvitationService.listMyPendingInvitations();
+        return ResponseEntity.ok(ApiResponses.of("CLS-0355", LmsStatusCode.SUCCESS, null, data));
+    }
+
+    @Operation(summary = "CLS-0356 · Accept class invitation")
+    @PatchMapping("/invitations/{invitationId}/accept")
+    @PreAuthorize("hasRole('STUDENT')")
+    public ResponseEntity<ApiResponse<ClassInvitationPayload>> acceptInvitation(
+            @PathVariable Long invitationId
+    ) {
+        ClassInvitationPayload data = classInvitationService.acceptInvitation(invitationId);
+        return ResponseEntity.ok(ApiResponses.of("CLS-0356", LmsStatusCode.SUCCESS, null, data));
+    }
+
+    @Operation(summary = "CLS-0357 · Decline class invitation")
+    @PatchMapping("/invitations/{invitationId}/decline")
+    @PreAuthorize("hasRole('STUDENT')")
+    public ResponseEntity<ApiResponse<ClassInvitationPayload>> declineInvitation(
+            @PathVariable Long invitationId
+    ) {
+        ClassInvitationPayload data = classInvitationService.declineInvitation(invitationId);
+        return ResponseEntity.ok(ApiResponses.of("CLS-0357", LmsStatusCode.SUCCESS, null, data));
+    }
+
+    @Operation(summary = "CLS-0358 · List pending invitations for a class")
+    @GetMapping("/{id}/invitations")
+    @PreAuthorize("hasAuthority('" + LmsAuthority.CLS_READ + "')")
+    public ResponseEntity<ApiResponse<List<ClassInvitationPayload>>> listClassInvitations(
+            @PathVariable Long id
+    ) {
+        List<ClassInvitationPayload> data = classInvitationService.listPendingInvitationsForClass(id);
+        return ResponseEntity.ok(ApiResponses.of("CLS-0358", LmsStatusCode.SUCCESS, null, data));
+    }
+
     @Operation(summary = "CLS-0370 · List students in class")
     @GetMapping("/{id}/students")
     @PreAuthorize("hasAuthority('" + LmsAuthority.CLS_READ + "')")
     public ResponseEntity<ApiResponse<List<UserDetailPayload>>> listClassStudents(@PathVariable Long id) {
         List<UserDetailPayload> data = classManagementService.listClassStudents(id);
         return ResponseEntity.ok(ApiResponses.of("CLS-0370", LmsStatusCode.SUCCESS, null, data));
+    }
+
+    @Operation(summary = "CLS-0380 · List class comments")
+    @GetMapping("/{id}/comments")
+    @PreAuthorize("hasAuthority('" + LmsAuthority.CLS_READ + "')")
+    public ResponseEntity<ApiResponse<List<ClassCommentPayload>>> listComments(@PathVariable Long id) {
+        List<ClassCommentPayload> data = classCommentService.listComments(id);
+        return ResponseEntity.ok(ApiResponses.of("CLS-0380", LmsStatusCode.SUCCESS, null, data));
+    }
+
+    @Operation(summary = "CLS-0385 · Post class comment")
+    @PostMapping("/{id}/comments")
+    @PreAuthorize("hasAuthority('" + LmsAuthority.CLS_READ + "')")
+    public ResponseEntity<ApiResponse<ClassCommentPayload>> createComment(
+            @PathVariable Long id,
+            @Valid @RequestBody CreateClassCommentRequest request
+    ) {
+        ClassCommentPayload data = classCommentService.createComment(id, request);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponses.of("CLS-0385", LmsStatusCode.CREATED, null, data));
     }
 }
