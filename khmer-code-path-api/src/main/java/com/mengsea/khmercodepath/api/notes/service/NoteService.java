@@ -3,6 +3,8 @@ package com.mengsea.khmercodepath.api.notes.service;
 import com.mengsea.khmercodepath.api.notes.payload.CreateNoteRequest;
 import com.mengsea.khmercodepath.api.notes.payload.NoteListPayload;
 import com.mengsea.khmercodepath.api.notes.payload.NotePayload;
+import com.mengsea.khmercodepath.api.notes.payload.NoteSharePayload;
+import com.mengsea.khmercodepath.api.notes.payload.SharedNotePayload;
 import com.mengsea.khmercodepath.api.notes.payload.UpdateNoteRequest;
 
 public interface NoteService {
@@ -16,4 +18,8 @@ public interface NoteService {
     NotePayload update(Long id, UpdateNoteRequest request);
 
     void delete(Long id);
+
+    NoteSharePayload enableShare(Long id);
+
+    SharedNotePayload getShared(String shareToken);
 }

@@ -23,4 +23,6 @@ public class CreateNoteRequest {
     private Long materialId;
 
     private List<@Size(max = 50) String> tags;
+
+    private Boolean favorite;
 }

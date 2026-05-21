@@ -3,6 +3,8 @@ package com.mengsea.khmercodepath.api.notes.controller;
 import com.mengsea.khmercodepath.api.notes.payload.CreateNoteRequest;
 import com.mengsea.khmercodepath.api.notes.payload.NoteListPayload;
 import com.mengsea.khmercodepath.api.notes.payload.NotePayload;
+import com.mengsea.khmercodepath.api.notes.payload.NoteSharePayload;
+import com.mengsea.khmercodepath.api.notes.payload.SharedNotePayload;
 import com.mengsea.khmercodepath.api.notes.payload.UpdateNoteRequest;
 import com.mengsea.khmercodepath.api.notes.service.NoteService;
 import com.mengsea.khmercodepath.commons.api.ApiResponse;
@@ -77,5 +79,19 @@ public class NoteController {
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
         noteService.delete(id);
         return ResponseEntity.ok(ApiResponses.of("NOTE-0950", LmsStatusCode.SUCCESS, null, null));
+    }
+
+    @Operation(summary = "NOTE-0970 · Enable share link")
+    @PostMapping("/{id}/share")
+    public ResponseEntity<ApiResponse<NoteSharePayload>> share(@PathVariable Long id) {
+        NoteSharePayload data = noteService.enableShare(id);
+        return ResponseEntity.ok(ApiResponses.of("NOTE-0970", LmsStatusCode.SUCCESS, null, data));
+    }
+
+    @Operation(summary = "NOTE-0980 · Get shared note (read-only)")
+    @GetMapping("/shared/{token}")
+    public ResponseEntity<ApiResponse<SharedNotePayload>> getShared(@PathVariable String token) {
+        SharedNotePayload data = noteService.getShared(token);
+        return ResponseEntity.ok(ApiResponses.of("NOTE-0980", LmsStatusCode.SUCCESS, null, data));
     }
 }

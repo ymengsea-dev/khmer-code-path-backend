@@ -55,6 +55,15 @@ public class UserNote {
     private String tags = "";
 
     @Column(nullable = false)
+    private boolean favorite;
+
+    @Column(name = "share_token", length = 36)
+    private String shareToken;
+
+    @Column(name = "share_enabled", nullable = false)
+    private boolean shareEnabled;
+
+    @Column(nullable = false)
     private boolean deleted;
 
     @CreationTimestamp

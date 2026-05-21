@@ -3,7 +3,9 @@ package com.mengsea.khmercodepath.api.notes.service;
 import com.mengsea.khmercodepath.api.notes.payload.CreateNoteRequest;
 import com.mengsea.khmercodepath.api.notes.payload.NoteListPayload;
 import com.mengsea.khmercodepath.api.notes.payload.NotePayload;
+import com.mengsea.khmercodepath.api.notes.payload.NoteSharePayload;
 import com.mengsea.khmercodepath.api.notes.payload.NoteSummaryPayload;
+import com.mengsea.khmercodepath.api.notes.payload.SharedNotePayload;
 import com.mengsea.khmercodepath.api.notes.payload.UpdateNoteRequest;
 import com.mengsea.khmercodepath.commons.constant.ExceptionCode;
 import com.mengsea.khmercodepath.commons.domain.User;
@@ -18,6 +20,7 @@ import org.springframework.util.StringUtils;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -55,6 +58,9 @@ public class NoteServiceImpl implements NoteService {
         note.setUser(me);
         applyContent(note, request.getTitle(), request.getBodyHtml(), request.getSourceLabel(),
                 request.getLessonId(), request.getMaterialId(), request.getTags());
+        if (request.getFavorite() != null) {
+            note.setFavorite(request.getFavorite());
+        }
         note.setDeleted(false);
         return toPayload(userNoteRepository.save(note));
     }
@@ -65,7 +71,48 @@ public class NoteServiceImpl implements NoteService {
         UserNote note = requireOwnedNote(id);
         applyContent(note, request.getTitle(), request.getBodyHtml(), request.getSourceLabel(),
                 request.getLessonId(), request.getMaterialId(), request.getTags());
+        if (request.getFavorite() != null) {
+            note.setFavorite(request.getFavorite());
+        }
         return toPayload(userNoteRepository.save(note));
+    }
+
+    @Override
+    @Transactional
+    public NoteSharePayload enableShare(Long id) {
+        UserNote note = requireOwnedNote(id);
+        if (!StringUtils.hasText(note.getShareToken())) {
+            note.setShareToken(UUID.randomUUID().toString());
+        }
+        note.setShareEnabled(true);
+        userNoteRepository.save(note);
+        return NoteSharePayload.builder()
+                .shareToken(note.getShareToken())
+                .sharePath("/?view=notebook&share=" + note.getShareToken())
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public SharedNotePayload getShared(String shareToken) {
+        SecurityUtils.requireCurrentUser();
+        UserNote note = userNoteRepository
+                .findSharedWithOwner(shareToken.trim())
+                .orElseThrow(() -> new BusinessException(ExceptionCode.NOTE_NOT_FOUND));
+        User owner = note.getUser();
+        String ownerName = StringUtils.hasText(owner.getUsername())
+                ? owner.getUsername()
+                : owner.getEmail();
+        return SharedNotePayload.builder()
+                .id(note.getId())
+                .title(note.getTitle())
+                .bodyHtml(note.getBodyHtml())
+                .preview(note.getPreview())
+                .tags(decodeTags(note.getTags()))
+                .sourceLabel(note.getSourceLabel())
+                .ownerDisplayName(ownerName)
+                .updatedAt(note.getUpdatedAt())
+                .build();
     }
 
     @Override
@@ -116,7 +163,7 @@ public class NoteServiceImpl implements NoteService {
 
     private static String encodeTags(List<String> tags) {
         if (tags == null || tags.isEmpty()) {
-            return "Personal";
+            return "";
         }
         return tags.stream()
                 .filter(StringUtils::hasText)
@@ -128,7 +175,7 @@ public class NoteServiceImpl implements NoteService {
 
     private static List<String> decodeTags(String tags) {
         if (!StringUtils.hasText(tags)) {
-            return List.of("Personal");
+            return List.of();
         }
         return Arrays.stream(tags.split(","))
                 .map(String::trim)
@@ -142,6 +189,7 @@ public class NoteServiceImpl implements NoteService {
                 .title(note.getTitle())
                 .preview(note.getPreview())
                 .tags(decodeTags(note.getTags()))
+                .favorite(note.isFavorite())
                 .sourceLabel(note.getSourceLabel())
                 .updatedAt(note.getUpdatedAt())
                 .build();
@@ -157,6 +205,9 @@ public class NoteServiceImpl implements NoteService {
                 .sourceLabel(note.getSourceLabel())
                 .lessonId(note.getLessonId())
                 .materialId(note.getMaterialId())
+                .favorite(note.isFavorite())
+                .shareToken(note.getShareToken())
+                .shareEnabled(note.isShareEnabled())
                 .createdAt(note.getCreatedAt())
                 .updatedAt(note.getUpdatedAt())
                 .build();

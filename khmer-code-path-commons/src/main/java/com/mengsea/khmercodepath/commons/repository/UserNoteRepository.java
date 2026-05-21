@@ -24,4 +24,11 @@ public interface UserNoteRepository extends JpaRepository<UserNote, Long> {
             ORDER BY n.updatedAt DESC
             """)
     List<UserNote> searchByUser(@Param("userUuid") String userUuid, @Param("search") String search);
+
+    @Query("""
+            SELECT n FROM UserNote n JOIN FETCH n.user
+            WHERE n.shareToken = :shareToken
+            AND n.shareEnabled = true AND n.deleted = false
+            """)
+    Optional<UserNote> findSharedWithOwner(@Param("shareToken") String shareToken);
 }

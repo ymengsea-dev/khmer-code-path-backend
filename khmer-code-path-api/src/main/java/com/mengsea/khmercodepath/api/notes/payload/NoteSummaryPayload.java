@@ -13,6 +13,7 @@ public class NoteSummaryPayload {
     String title;
     String preview;
     List<String> tags;
+    boolean favorite;
     String sourceLabel;
     LocalDateTime updatedAt;
 }

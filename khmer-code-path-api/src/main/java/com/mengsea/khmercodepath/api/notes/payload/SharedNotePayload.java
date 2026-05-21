@@ -6,20 +6,16 @@ import lombok.Value;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/** Read-only note opened via share link (any authenticated app user). */
 @Value
 @Builder
-public class NotePayload {
+public class SharedNotePayload {
     Long id;
     String title;
     String bodyHtml;
     String preview;
     List<String> tags;
     String sourceLabel;
-    Long lessonId;
-    Long materialId;
-    boolean favorite;
-    String shareToken;
-    boolean shareEnabled;
-    LocalDateTime createdAt;
+    String ownerDisplayName;
     LocalDateTime updatedAt;
 }
