@@ -1,31 +1,23 @@
 package com.mengsea.khmercodepath.commons.config.ai;
 
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
-import org.springframework.ai.chat.memory.ChatMemory;
-import org.springframework.ai.chat.memory.InMemoryChatMemoryRepository;
-import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
 public class AiConfig {
 
-    @Bean
-    public ChatMemory chatMemory() {
-        return MessageWindowChatMemory.builder()
-                .chatMemoryRepository(new InMemoryChatMemoryRepository())
-                .maxMessages(20)
-                .build();
-    }
+    public static final String TUTOR_SYSTEM_PROMPT = """
+            You are Khmer Code Path Learning Assistant, an AI tutor for a university LMS.
+            Help students and teachers with programming, algorithms, course concepts, and study skills.
+            Be accurate, encouraging, and concise. If you are unsure, say so instead of inventing facts.
+            When answering coding questions, use clear examples and explain your reasoning step by step.
+            """;
 
     @Bean
-    public ChatClient chatClient(ChatClient.Builder builder, ChatMemory chatMemory) {
+    public ChatClient tutoringChatClient(ChatClient.Builder builder) {
         return builder
-                .defaultSystem("you are a helpful")
-                .defaultAdvisors(
-                        MessageChatMemoryAdvisor.builder(chatMemory).build()
-                )
+                .defaultSystem(TUTOR_SYSTEM_PROMPT)
                 .build();
     }
 }

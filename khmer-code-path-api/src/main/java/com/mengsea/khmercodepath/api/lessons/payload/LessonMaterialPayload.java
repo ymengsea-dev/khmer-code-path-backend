@@ -11,4 +11,6 @@ public class LessonMaterialPayload {
     private String contentType;
     private long fileSizeBytes;
     private String downloadUrl;
+    /** RAG vector index state: NOT_INDEXED, READY, etc. */
+    private String ragStatus;
 }

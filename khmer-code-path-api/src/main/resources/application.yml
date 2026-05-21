@@ -8,7 +8,7 @@ spring:
   application:
     name: khmer-code-path-backend
   profiles:
-    default: dev
+    default: dev,ollama
   config:
     import: optional:file:.env[.properties]
   datasource:
@@ -50,8 +50,9 @@ spring:
 
   ai:
     model:
-      embedding:
-        text: google-genai
+      # Required when both google-genai and ollama starters are on the classpath (both use matchIfMissing).
+      chat: google-genai
+      embedding: google-genai
 
     google:
       genai:
@@ -81,6 +82,11 @@ jwt:
 
 lms:
   uploads-dir: ${LMS_UPLOADS_DIR:./uploads}
+  storage:
+    provider: ${LMS_STORAGE_PROVIDER:minio}
+  ai:
+    history-window: 20
+    ingest-on-startup: false
 
 minio:
   url: ${MINIO_URL}

@@ -4,8 +4,13 @@ import com.mengsea.khmercodepath.api.lessons.payload.AssignLibraryItemRequest;
 import com.mengsea.khmercodepath.api.lessons.payload.CreateLessonRequest;
 import com.mengsea.khmercodepath.api.lessons.payload.CreateLibraryItemRequest;
 import com.mengsea.khmercodepath.api.lessons.payload.LessonDetailPayload;
+import com.mengsea.khmercodepath.api.lessons.payload.LibraryMaterialPayload;
 import com.mengsea.khmercodepath.api.lessons.payload.MaterialLibraryItemPayload;
-import com.mengsea.khmercodepath.api.lessons.storage.LocalUploadStorage;
+import com.mengsea.khmercodepath.commons.constant.MaterialSourceType;
+import com.mengsea.khmercodepath.commons.constant.RagIndexStatus;
+import com.mengsea.khmercodepath.commons.repository.MaterialRagIndexRepository;
+import com.mengsea.khmercodepath.api.ai.rag.MaterialRagVectorService;
+import com.mengsea.khmercodepath.api.storage.UploadStorage;
 import com.mengsea.khmercodepath.commons.constant.ExceptionCode;
 import com.mengsea.khmercodepath.commons.constant.LibraryIconType;
 import com.mengsea.khmercodepath.commons.domain.LmsClass;
@@ -32,7 +37,9 @@ public class MaterialLibraryServiceImpl implements MaterialLibraryService {
     private final MaterialLibraryMaterialRepository materialLibraryMaterialRepository;
     private final LessonManagementService lessonManagementService;
     private final ClassAccessHelper classAccessHelper;
-    private final LocalUploadStorage localUploadStorage;
+    private final UploadStorage uploadStorage;
+    private final MaterialRagVectorService materialRagVectorService;
+    private final MaterialRagIndexRepository materialRagIndexRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -83,8 +90,8 @@ public class MaterialLibraryServiceImpl implements MaterialLibraryService {
             throw new BusinessException(ExceptionCode.VALIDATION_ERROR);
         }
         for (MultipartFile file : files) {
-            LocalUploadStorage.StoredFile stored =
-                    localUploadStorage.store("library", libraryItemId, file);
+            UploadStorage.StoredFile stored =
+                    uploadStorage.store("library", libraryItemId, file);
             MaterialLibraryMaterial material = new MaterialLibraryMaterial();
             material.setLibraryItem(item);
             material.setFileName(stored.fileName());
@@ -93,7 +100,23 @@ public class MaterialLibraryServiceImpl implements MaterialLibraryService {
             material.setStorageKey(stored.storageKey());
             material.setDeleted(false);
             materialLibraryMaterialRepository.save(material);
+            materialRagVectorService.registerLibraryMaterial(
+                    material.getId(), stored.storageKey(), stored.fileName(), stored.contentType());
         }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<LibraryMaterialPayload> listLibraryMaterials(Long libraryItemId) {
+        User me = SecurityUtils.requireCurrentUser();
+        materialLibraryItemRepository
+                .findByIdAndTeacher_UuidAndDeletedFalse(libraryItemId, me.getUuid())
+                .orElseThrow(() -> new BusinessException(ExceptionCode.LIBRARY_ITEM_NOT_FOUND));
+        return materialLibraryMaterialRepository
+                .findByLibraryItem_IdAndDeletedFalseOrderByCreatedAtAsc(libraryItemId)
+                .stream()
+                .map(this::toLibraryMaterialPayload)
+                .toList();
     }
 
     @Override
@@ -125,6 +148,21 @@ public class MaterialLibraryServiceImpl implements MaterialLibraryService {
                 .gradient(item.getGradient())
                 .assetCount(assetCount)
                 .updatedAt(item.getUpdatedAt())
+                .build();
+    }
+
+    private LibraryMaterialPayload toLibraryMaterialPayload(MaterialLibraryMaterial material) {
+        String ragStatus = materialRagIndexRepository
+                .findBySourceTypeAndSourceId(MaterialSourceType.LIBRARY_MATERIAL, material.getId())
+                .map(idx -> idx.getStatus().name())
+                .orElse(RagIndexStatus.NOT_INDEXED.name());
+        return LibraryMaterialPayload.builder()
+                .id(material.getId())
+                .libraryItemId(material.getLibraryItem().getId())
+                .fileName(material.getFileName())
+                .contentType(material.getContentType())
+                .fileSizeBytes(material.getFileSizeBytes())
+                .ragStatus(ragStatus)
                 .build();
     }
 

@@ -25,6 +25,7 @@ dependencies {
 
     api 'org.springframework.ai:spring-ai-starter-model-google-genai'
     api 'org.springframework.ai:spring-ai-starter-model-google-genai-embedding'
+    api 'org.springframework.ai:spring-ai-starter-model-ollama'
     api 'org.springframework.ai:spring-ai-starter-vector-store-pgvector'
     api 'org.springframework.ai:spring-ai-advisors-vector-store'
     api 'org.springframework.ai:spring-ai-pdf-document-reader'

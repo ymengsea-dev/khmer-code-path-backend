@@ -23,6 +23,8 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -56,11 +58,12 @@ public class NotificationController {
 
     @Operation(summary = "NOTIF-1440 · Real-time notification stream (SSE)")
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public SseEmitter stream() {
-        User me = SecurityUtils.requireCurrentUser();
-        SseEmitter emitter = notificationSseHub.subscribe(me.getUuid());
+        String userUuid = SecurityUtils.requireCurrentUser().getUuid();
         long unread = notificationService.unreadCount().getCount();
-        notificationSseHub.publishUnreadCount(me.getUuid(), unread);
+        SseEmitter emitter = notificationSseHub.subscribe(userUuid);
+        notificationSseHub.publishUnreadCount(userUuid, unread);
         return emitter;
     }
 

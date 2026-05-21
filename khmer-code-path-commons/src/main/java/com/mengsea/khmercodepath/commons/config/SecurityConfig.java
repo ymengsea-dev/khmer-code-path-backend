@@ -7,6 +7,7 @@ import com.mengsea.khmercodepath.commons.security.AccessDeniedEntryPoint;
 import com.mengsea.khmercodepath.commons.security.JwtExpirationEntryPoint;
 import com.mengsea.khmercodepath.commons.security.UserDetailService;
 import com.mengsea.khmercodepath.commons.security.oauth2.CustomOAuth2UserService;
+import jakarta.servlet.DispatcherType;
 import lombok.AllArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -45,6 +46,8 @@ public class SecurityConfig {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                // Keep JWT auth on the initial SSE request; async continuations must not re-authorize (no token on dispatch).
+                .securityContext(sc -> sc.requireExplicitSave(false))
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(jwtExpirationEntryPoint)
                         .accessDeniedHandler(accessDeniedEntryPoint)
@@ -66,6 +69,7 @@ public class SecurityConfig {
                         ).permitAll()
                         .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        .dispatcherTypeMatchers(DispatcherType.ASYNC).permitAll()
                         .anyRequest().authenticated()
                 ).oauth2Login(oauth -> oauth
                         .userInfoEndpoint(userInfo -> userInfo

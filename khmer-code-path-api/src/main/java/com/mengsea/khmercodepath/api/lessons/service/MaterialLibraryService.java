@@ -3,6 +3,7 @@ package com.mengsea.khmercodepath.api.lessons.service;
 import com.mengsea.khmercodepath.api.lessons.payload.AssignLibraryItemRequest;
 import com.mengsea.khmercodepath.api.lessons.payload.CreateLibraryItemRequest;
 import com.mengsea.khmercodepath.api.lessons.payload.LessonDetailPayload;
+import com.mengsea.khmercodepath.api.lessons.payload.LibraryMaterialPayload;
 import com.mengsea.khmercodepath.api.lessons.payload.MaterialLibraryItemPayload;
 import com.mengsea.khmercodepath.commons.constant.LibraryIconType;
 import org.springframework.web.multipart.MultipartFile;
@@ -16,6 +17,8 @@ public interface MaterialLibraryService {
     MaterialLibraryItemPayload createLibraryItem(CreateLibraryItemRequest request);
 
     void uploadLibraryMaterials(Long libraryItemId, List<MultipartFile> files);
+
+    List<LibraryMaterialPayload> listLibraryMaterials(Long libraryItemId);
 
     LessonDetailPayload assignToClass(Long libraryItemId, AssignLibraryItemRequest request);
 }

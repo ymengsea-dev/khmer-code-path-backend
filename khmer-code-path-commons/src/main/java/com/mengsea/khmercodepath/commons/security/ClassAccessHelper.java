@@ -46,15 +46,18 @@ public class ClassAccessHelper {
     }
 
     public void assertCanManageClass(LmsClass entity) {
+        if (!canManageClass(entity)) {
+            throw new BusinessException(ExceptionCode.ACCESS_DENIED);
+        }
+    }
+
+    public boolean canManageClass(LmsClass entity) {
         User me = SecurityUtils.requireCurrentUser();
         if (me.getRole() == Role.ADMIN) {
-            return;
+            return true;
         }
-        if (me.getRole() == Role.TEACHER
-                && Objects.equals(me.getUuid(), entity.getTeacher().getUuid())) {
-            return;
-        }
-        throw new BusinessException(ExceptionCode.ACCESS_DENIED);
+        return me.getRole() == Role.TEACHER
+                && Objects.equals(me.getUuid(), entity.getTeacher().getUuid());
     }
 
     public User requireStudent(String studentUuid) {

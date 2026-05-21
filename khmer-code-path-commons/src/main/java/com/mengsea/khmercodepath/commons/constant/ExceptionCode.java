@@ -48,7 +48,13 @@ public enum ExceptionCode {
     NOTIFICATION_NOT_FOUND(LmsStatusCode.NOT_FOUND, "Notification not found"),
     INVITATION_NOT_FOUND(LmsStatusCode.NOT_FOUND, "Class invitation not found"),
     INVITATION_ALREADY_RESPONDED(LmsStatusCode.OPERATION_NOT_ALLOWED, "Invitation has already been accepted or declined"),
-    STUDENT_ALREADY_ENROLLED(LmsStatusCode.CONFLICT, "Student is already enrolled in this class");
+    STUDENT_ALREADY_ENROLLED(LmsStatusCode.CONFLICT, "Student is already enrolled in this class"),
+    AI_CONVERSATION_NOT_FOUND(LmsStatusCode.NOT_FOUND, "AI conversation not found"),
+    MATERIAL_RAG_NOT_READY(LmsStatusCode.OPERATION_NOT_ALLOWED,
+            "Material is not indexed for AI. Upload a supported file and try again."),
+    MATERIAL_RAG_INDEX_FAILED(LmsStatusCode.INTERNAL_SERVER_ERROR,
+            "Failed to index material for AI retrieval"),
+    NOTE_NOT_FOUND(LmsStatusCode.NOT_FOUND, "Note not found");
 
     private final LmsStatusCode statusCode;
     private final String message;

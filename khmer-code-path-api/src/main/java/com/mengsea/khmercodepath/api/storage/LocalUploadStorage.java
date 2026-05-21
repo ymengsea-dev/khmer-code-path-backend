@@ -1,14 +1,16 @@
-package com.mengsea.khmercodepath.api.lessons.storage;
+package com.mengsea.khmercodepath.api.storage;
 
 import com.mengsea.khmercodepath.commons.constant.ExceptionCode;
 import com.mengsea.khmercodepath.commons.exception.BusinessException;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -17,7 +19,8 @@ import java.util.Set;
 import java.util.UUID;
 
 @Component
-public class LocalUploadStorage {
+@ConditionalOnProperty(name = "lms.storage.provider", havingValue = "local")
+public class LocalUploadStorage implements UploadStorage {
 
     private static final long MAX_FILE_BYTES = 50L * 1024 * 1024;
     private static final int MAX_FILES_PER_BATCH = 10;
@@ -30,10 +33,12 @@ public class LocalUploadStorage {
         Files.createDirectories(this.root);
     }
 
+    @Override
     public int maxFilesPerBatch() {
         return MAX_FILES_PER_BATCH;
     }
 
+    @Override
     public StoredFile store(String category, Long ownerId, MultipartFile file) {
         validateFile(file);
         String safeName = sanitizeFileName(file.getOriginalFilename());
@@ -51,6 +56,7 @@ public class LocalUploadStorage {
         return new StoredFile(key, safeName, file.getContentType(), file.getSize());
     }
 
+    @Override
     public Resource loadAsResource(String storageKey) {
         try {
             Path file = root.resolve(storageKey).normalize();
@@ -69,6 +75,20 @@ public class LocalUploadStorage {
         }
     }
 
+    @Override
+    public InputStream openStream(String storageKey) {
+        try {
+            Path file = root.resolve(storageKey).normalize();
+            if (!file.startsWith(root) || !Files.exists(file)) {
+                throw new BusinessException(ExceptionCode.VALIDATION_ERROR);
+            }
+            return Files.newInputStream(file);
+        } catch (IOException ex) {
+            throw new BusinessException(ExceptionCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @Override
     public void copyStorageFile(String sourceKey, String targetKey) {
         try {
             Path source = root.resolve(sourceKey).normalize();
@@ -83,7 +103,19 @@ public class LocalUploadStorage {
         }
     }
 
-    private void validateFile(MultipartFile file) {
+    @Override
+    public void delete(String storageKey) {
+        try {
+            Path file = root.resolve(storageKey).normalize();
+            if (file.startsWith(root) && Files.exists(file)) {
+                Files.delete(file);
+            }
+        } catch (IOException ex) {
+            throw new BusinessException(ExceptionCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    public static void validateFile(MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new BusinessException(ExceptionCode.VALIDATION_ERROR);
         }
@@ -100,7 +132,7 @@ public class LocalUploadStorage {
         }
     }
 
-    private static String extension(String name) {
+    public static String extension(String name) {
         int dot = name.lastIndexOf('.');
         if (dot < 0) {
             return "";
@@ -108,12 +140,14 @@ public class LocalUploadStorage {
         return name.substring(dot + 1).toLowerCase(Locale.ROOT);
     }
 
-    private static String sanitizeFileName(String name) {
+    static String sanitizeFileName(String name) {
         if (name == null || name.isBlank()) {
             return "file";
         }
         return name.replaceAll("[^a-zA-Z0-9._-]", "_");
     }
 
-    public record StoredFile(String storageKey, String fileName, String contentType, long sizeBytes) {}
+    public static boolean isAllowedExtension(String fileName) {
+        return ALLOWED_EXT.contains(extension(fileName));
+    }
 }

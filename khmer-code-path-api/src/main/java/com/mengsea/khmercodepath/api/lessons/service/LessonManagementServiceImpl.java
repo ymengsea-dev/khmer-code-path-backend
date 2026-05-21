@@ -6,7 +6,9 @@ import com.mengsea.khmercodepath.api.lessons.payload.LessonDetailPayload;
 import com.mengsea.khmercodepath.api.lessons.payload.LessonMaterialPayload;
 import com.mengsea.khmercodepath.api.lessons.payload.LessonSummaryPayload;
 import com.mengsea.khmercodepath.api.lessons.payload.UpdateLessonRequest;
-import com.mengsea.khmercodepath.api.lessons.storage.LocalUploadStorage;
+import com.mengsea.khmercodepath.api.ai.rag.MaterialRagVectorService;
+import com.mengsea.khmercodepath.api.storage.UploadStorage;
+import com.mengsea.khmercodepath.commons.constant.MaterialSourceType;
 import com.mengsea.khmercodepath.commons.constant.ExceptionCode;
 import com.mengsea.khmercodepath.commons.constant.Role;
 import com.mengsea.khmercodepath.commons.domain.Lesson;
@@ -16,7 +18,9 @@ import com.mengsea.khmercodepath.commons.domain.MaterialLibraryItem;
 import com.mengsea.khmercodepath.commons.domain.MaterialLibraryMaterial;
 import com.mengsea.khmercodepath.commons.domain.User;
 import com.mengsea.khmercodepath.commons.exception.BusinessException;
+import com.mengsea.khmercodepath.commons.constant.RagIndexStatus;
 import com.mengsea.khmercodepath.commons.repository.LessonMaterialRepository;
+import com.mengsea.khmercodepath.commons.repository.MaterialRagIndexRepository;
 import com.mengsea.khmercodepath.commons.repository.LessonRepository;
 import com.mengsea.khmercodepath.commons.repository.MaterialLibraryItemRepository;
 import com.mengsea.khmercodepath.commons.repository.MaterialLibraryMaterialRepository;
@@ -42,7 +46,9 @@ public class LessonManagementServiceImpl implements LessonManagementService {
     private final MaterialLibraryItemRepository materialLibraryItemRepository;
     private final MaterialLibraryMaterialRepository materialLibraryMaterialRepository;
     private final ClassAccessHelper classAccessHelper;
-    private final LocalUploadStorage localUploadStorage;
+    private final UploadStorage uploadStorage;
+    private final MaterialRagVectorService materialRagVectorService;
+    private final MaterialRagIndexRepository materialRagIndexRepository;
     private final NotificationPublisher notificationPublisher;
 
     @Override
@@ -126,7 +132,7 @@ public class LessonManagementServiceImpl implements LessonManagementService {
         if (files == null || files.isEmpty()) {
             throw new BusinessException(ExceptionCode.VALIDATION_ERROR);
         }
-        if (files.size() > localUploadStorage.maxFilesPerBatch()) {
+        if (files.size() > uploadStorage.maxFilesPerBatch()) {
             throw new BusinessException(ExceptionCode.VALIDATION_ERROR);
         }
         long existing = lessonMaterialRepository.countByLesson_IdAndDeletedFalse(lessonId);
@@ -135,8 +141,8 @@ public class LessonManagementServiceImpl implements LessonManagementService {
         }
         List<LessonMaterialPayload> result = new ArrayList<>();
         for (MultipartFile file : files) {
-            LocalUploadStorage.StoredFile stored =
-                    localUploadStorage.store("lessons", lessonId, file);
+            UploadStorage.StoredFile stored =
+                    uploadStorage.store("lessons", lessonId, file);
             LessonMaterial material = new LessonMaterial();
             material.setLesson(lesson);
             material.setFileName(stored.fileName());
@@ -145,6 +151,8 @@ public class LessonManagementServiceImpl implements LessonManagementService {
             material.setStorageKey(stored.storageKey());
             material.setDeleted(false);
             lessonMaterialRepository.save(material);
+            materialRagVectorService.registerLessonMaterial(
+                    material.getId(), lessonId, stored.storageKey(), stored.fileName(), stored.contentType());
             result.add(toMaterialPayload(material));
         }
         return result;
@@ -162,6 +170,8 @@ public class LessonManagementServiceImpl implements LessonManagementService {
         }
         material.setDeleted(true);
         lessonMaterialRepository.save(material);
+        materialRagVectorService.removeIndex(
+                MaterialSourceType.LESSON_MATERIAL, material.getId(), null);
     }
 
     @Override
@@ -184,7 +194,7 @@ public class LessonManagementServiceImpl implements LessonManagementService {
         if (request.isIncludeMaterials()) {
             for (LessonMaterial src : lessonMaterialRepository.findByLesson_IdAndDeletedFalseOrderByCreatedAtAsc(id)) {
                 String newKey = "lessons/" + copy.getId() + "/" + java.util.UUID.randomUUID() + "_" + src.getFileName();
-                localUploadStorage.copyStorageFile(src.getStorageKey(), newKey);
+                uploadStorage.copyStorageFile(src.getStorageKey(), newKey);
                 LessonMaterial material = new LessonMaterial();
                 material.setLesson(copy);
                 material.setFileName(src.getFileName());
@@ -193,6 +203,8 @@ public class LessonManagementServiceImpl implements LessonManagementService {
                 material.setStorageKey(newKey);
                 material.setDeleted(false);
                 lessonMaterialRepository.save(material);
+                materialRagVectorService.registerLessonMaterial(
+                        material.getId(), copy.getId(), newKey, material.getFileName(), material.getContentType());
             }
         }
         return toDetail(copy);
@@ -207,7 +219,7 @@ public class LessonManagementServiceImpl implements LessonManagementService {
         if (!Objects.equals(material.getLesson().getId(), lessonId)) {
             throw new BusinessException(ExceptionCode.MATERIAL_NOT_FOUND);
         }
-        return localUploadStorage.loadAsResource(material.getStorageKey());
+        return uploadStorage.loadAsResource(material.getStorageKey());
     }
 
     private Lesson requireReadableLesson(Long id) {
@@ -236,7 +248,7 @@ public class LessonManagementServiceImpl implements LessonManagementService {
                 materialLibraryMaterialRepository.findByLibraryItem_IdAndDeletedFalseOrderByCreatedAtAsc(
                         libraryItemId)) {
             String newKey = "lessons/" + lesson.getId() + "/" + java.util.UUID.randomUUID() + "_" + src.getFileName();
-            localUploadStorage.copyStorageFile(src.getStorageKey(), newKey);
+            uploadStorage.copyStorageFile(src.getStorageKey(), newKey);
             LessonMaterial material = new LessonMaterial();
             material.setLesson(lesson);
             material.setFileName(src.getFileName());
@@ -245,6 +257,8 @@ public class LessonManagementServiceImpl implements LessonManagementService {
             material.setStorageKey(newKey);
             material.setDeleted(false);
             lessonMaterialRepository.save(material);
+            materialRagVectorService.registerLessonMaterial(
+                    material.getId(), lesson.getId(), newKey, material.getFileName(), material.getContentType());
         }
     }
 
@@ -286,6 +300,10 @@ public class LessonManagementServiceImpl implements LessonManagementService {
     }
 
     private LessonMaterialPayload toMaterialPayload(LessonMaterial material) {
+        String ragStatus = materialRagIndexRepository
+                .findBySourceTypeAndSourceId(MaterialSourceType.LESSON_MATERIAL, material.getId())
+                .map(idx -> idx.getStatus().name())
+                .orElse(RagIndexStatus.NOT_INDEXED.name());
         return LessonMaterialPayload.builder()
                 .id(material.getId())
                 .fileName(material.getFileName())
@@ -293,6 +311,7 @@ public class LessonManagementServiceImpl implements LessonManagementService {
                 .fileSizeBytes(material.getFileSizeBytes())
                 .downloadUrl("/api/v1/lessons/" + material.getLesson().getId()
                         + "/materials/" + material.getId() + "/download")
+                .ragStatus(ragStatus)
                 .build();
     }
 

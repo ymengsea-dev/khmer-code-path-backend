@@ -12,9 +12,9 @@ import com.mengsea.khmercodepath.commons.repository.LmsClassRepository;
 import com.mengsea.khmercodepath.commons.repository.NotificationRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -30,7 +30,6 @@ public class NotificationPublisher {
     private final ClassEnrollmentRepository classEnrollmentRepository;
     private final LmsClassRepository lmsClassRepository;
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void notifyUser(
             String userUuid,
             NotificationType type,
@@ -41,18 +40,11 @@ public class NotificationPublisher {
             Long resourceId
     ) {
         NotificationPayload payload = notificationService.createForUser(
-                userUuid,
-                type,
-                title,
-                message,
-                classId,
-                resourceType,
-                resourceId
-        );
-        long unread = notificationRepository.countByUser_UuidAndDeletedFalseAndReadFalse(userUuid);
-        notificationSseHub.publishNotification(userUuid, payload, unread);
+                userUuid, type, title, message, classId, resourceType, resourceId);
+        pushToSse(userUuid, payload);
     }
 
+    @Transactional
     public void notifyClassStudents(
             Long classId,
             String excludeUserUuid,
@@ -62,15 +54,26 @@ public class NotificationPublisher {
             String resourceType,
             Long resourceId
     ) {
-        List<ClassEnrollment> enrollments = classEnrollmentRepository.findByLmsClass_IdOrderByEnrolledAtAsc(classId);
+        List<ClassEnrollment> enrollments =
+                classEnrollmentRepository.findByLmsClass_IdOrderByEnrolledAtAsc(classId);
+        List<CreatedNotification> created = new ArrayList<>();
+
         for (ClassEnrollment enrollment : enrollments) {
             String studentUuid = enrollment.getStudent().getUuid();
             if (excludeUserUuid != null && excludeUserUuid.equals(studentUuid)) {
                 continue;
             }
-            notifyUser(studentUuid, type, title, message, classId, resourceType, resourceId);
+            NotificationPayload payload = notificationService.createForUser(
+                    studentUuid, type, title, message, classId, resourceType, resourceId);
+            created.add(new CreatedNotification(studentUuid, payload));
+        }
+
+        for (CreatedNotification item : created) {
+            pushToSse(item.userUuid(), item.payload());
         }
     }
+
+    private record CreatedNotification(String userUuid, NotificationPayload payload) {}
 
     public void notifyClassTeacher(
             LmsClass lmsClass,
@@ -175,5 +178,10 @@ public class NotificationPublisher {
                 "lesson",
                 lessonId
         );
+    }
+
+    private void pushToSse(String userUuid, NotificationPayload payload) {
+        long unread = notificationRepository.countByUser_UuidAndDeletedFalseAndReadFalse(userUuid);
+        notificationSseHub.publishNotification(userUuid, payload, unread);
     }
 }

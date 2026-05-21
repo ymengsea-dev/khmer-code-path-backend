@@ -20,12 +20,22 @@ import java.util.concurrent.CopyOnWriteArrayList;
 @Slf4j
 public class NotificationSseHub {
 
-    private static final long SSE_TIMEOUT_MS = 0L;
+    /**
+     * Long-lived SSE must not hold a DB connection for the whole request (see open-in-view=false).
+     * Clients reconnect before this expires; avoids infinite connections with timeout=0.
+     */
+    private static final long SSE_TIMEOUT_MS = 30 * 60 * 1000L;
 
     private final ObjectMapper objectMapper;
     private final Map<String, CopyOnWriteArrayList<SseEmitter>> emittersByUser = new ConcurrentHashMap<>();
 
+    /**
+     * Registers one active stream per user; closes any previous stream so reconnect loops
+     * do not leak connections.
+     */
     public SseEmitter subscribe(String userUuid) {
+        closeAllForUser(userUuid);
+
         SseEmitter emitter = new SseEmitter(SSE_TIMEOUT_MS);
         emittersByUser.computeIfAbsent(userUuid, ignored -> new CopyOnWriteArrayList<>()).add(emitter);
 
@@ -81,6 +91,20 @@ public class NotificationSseHub {
                 }
             }
         });
+    }
+
+    private void closeAllForUser(String userUuid) {
+        List<SseEmitter> existing = emittersByUser.remove(userUuid);
+        if (existing == null) {
+            return;
+        }
+        for (SseEmitter emitter : existing) {
+            try {
+                emitter.complete();
+            } catch (Exception ignored) {
+                // already closed
+            }
+        }
     }
 
     private void removeEmitter(String userUuid, SseEmitter emitter) {

@@ -3,6 +3,10 @@ package com.mengsea.khmercodepath.api.lessons.controller;
 import com.mengsea.khmercodepath.api.lessons.payload.AssignLibraryItemRequest;
 import com.mengsea.khmercodepath.api.lessons.payload.CreateLibraryItemRequest;
 import com.mengsea.khmercodepath.api.lessons.payload.LessonDetailPayload;
+import com.mengsea.khmercodepath.api.ai.payload.GenerateFromMaterialRequest;
+import com.mengsea.khmercodepath.api.ai.payload.QuizGeneratePayload;
+import com.mengsea.khmercodepath.api.ai.service.LibraryAiService;
+import com.mengsea.khmercodepath.api.lessons.payload.LibraryMaterialPayload;
 import com.mengsea.khmercodepath.api.lessons.payload.MaterialLibraryItemPayload;
 import com.mengsea.khmercodepath.api.lessons.service.MaterialLibraryService;
 import com.mengsea.khmercodepath.commons.api.ApiResponse;
@@ -40,6 +44,7 @@ import java.util.List;
 public class MaterialLibraryController {
 
     private final MaterialLibraryService materialLibraryService;
+    private final LibraryAiService libraryAiService;
 
     @Operation(summary = "LSN-0480 · List material library")
     @GetMapping
@@ -70,6 +75,26 @@ public class MaterialLibraryController {
         materialLibraryService.uploadLibraryMaterials(id, files);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponses.of("LSN-0482", LmsStatusCode.CREATED, null, null));
+    }
+
+    @Operation(summary = "List files uploaded to a library template")
+    @GetMapping("/{id}/materials")
+    public ResponseEntity<ApiResponse<List<LibraryMaterialPayload>>> listMaterials(
+            @PathVariable Long id
+    ) {
+        List<LibraryMaterialPayload> data = materialLibraryService.listLibraryMaterials(id);
+        return ResponseEntity.ok(ApiResponses.of("LSN-0484", LmsStatusCode.SUCCESS, null, data));
+    }
+
+    @Operation(summary = "QUIZ-0500 · Generate quiz from library template material (on-demand RAG)")
+    @PostMapping("/{id}/quizzes/generate")
+    @PreAuthorize("hasAuthority('" + LmsAuthority.AI_INGEST + "')")
+    public ResponseEntity<ApiResponse<QuizGeneratePayload>> generateQuiz(
+            @PathVariable Long id,
+            @Valid @RequestBody GenerateFromMaterialRequest request
+    ) {
+        QuizGeneratePayload data = libraryAiService.generateQuiz(id, request);
+        return ResponseEntity.ok(ApiResponses.of("QUIZ-0500", LmsStatusCode.SUCCESS, null, data));
     }
 
     @Operation(summary = "Assign library template to class")

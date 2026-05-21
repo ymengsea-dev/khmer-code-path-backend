@@ -34,8 +34,8 @@ spring:
               - profile
   ai:
     model:
-      embedding:
-        text: google-genai
+      chat: google-genai
+      embedding: google-genai
     google:
       genai:
         api-key: test-api-key
@@ -55,6 +55,10 @@ spring:
         dimensions: 768
         distance-type: COSINE_DISTANCE
         index-type: HNSW
+
+lms:
+  storage:
+    provider: local
 
 jwt:
   secret: YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY3ODkwMTIzNA==
