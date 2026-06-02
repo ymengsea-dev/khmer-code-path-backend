@@ -1,5 +1,6 @@
 package com.mengsea.khmercodepath.api.ai.service;
 
+import com.mengsea.khmercodepath.api.ai.gateway.LlmGateway;
 import com.mengsea.khmercodepath.api.ai.payload.GenerateFromMaterialRequest;
 import com.mengsea.khmercodepath.api.ai.payload.LessonSummaryGeneratePayload;
 import com.mengsea.khmercodepath.api.ai.payload.MaterialRagStatusPayload;
@@ -15,8 +16,10 @@ import com.mengsea.khmercodepath.commons.repository.LessonMaterialRepository;
 import com.mengsea.khmercodepath.commons.repository.LessonRepository;
 import com.mengsea.khmercodepath.commons.security.ClassAccessHelper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 @RequiredArgsConstructor
@@ -26,6 +29,7 @@ public class LessonAiServiceImpl implements LessonAiService {
     private final LessonMaterialRepository lessonMaterialRepository;
     private final ClassAccessHelper classAccessHelper;
     private final MaterialRagVectorService materialRagVectorService;
+    private final LlmGateway llmGateway;
 
     @Override
     @Transactional(readOnly = true)
@@ -111,6 +115,58 @@ public class LessonAiServiceImpl implements LessonAiService {
                 .build();
     }
 
+    @Override
+    @Transactional
+    public LessonSummaryGeneratePayload generateSummaryFromContent(Long lessonId) {
+        Lesson lesson = requireReadableLesson(lessonId);
+        String plainText = stripHtml(lesson.getDescription());
+
+        if (plainText.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "This lesson has no written notes. Add content in the lesson editor first.");
+        }
+
+        boolean forTeacher = classAccessHelper.canManageClass(lesson.getLmsClass());
+        String systemPrompt = forTeacher
+                ? """
+                You are an expert instructor. Read the lesson content and write a clear, structured summary
+                for students. Use this format:
+                Key Points:
+                - 3 to 5 concise bullet points
+                Quick Review:
+                - 1 short sentence
+                Keep the summary shorter than the original content. Focus on key concepts only.
+                Do not invent facts outside the provided content.
+                """
+                : """
+                You are a study assistant. Read the lesson content and write a clear, student-friendly summary.
+                Use this exact format:
+                Key Points:
+                - 3 to 5 concise bullet points
+                Quick Review:
+                - 1 short sentence
+                Keep the summary shorter than the original content. Explain key terms simply only if needed.
+                Focus only on what appears in the content. Do not invent facts outside it.
+                """;
+
+        String summary = llmGateway.completeWithContent(systemPrompt, plainText);
+
+        boolean persisted = false;
+        if (forTeacher) {
+            lesson.setSummary(summary);
+            lessonRepository.save(lesson);
+            persisted = true;
+        }
+
+        return LessonSummaryGeneratePayload.builder()
+                .lessonId(lessonId)
+                .materialId(null)
+                .summary(summary)
+                .sourceFileName(lesson.getTitle() + " (written notes)")
+                .persisted(persisted)
+                .build();
+    }
+
     private Lesson requireManageableLesson(Long lessonId) {
         Lesson lesson = requireReadableLesson(lessonId);
         classAccessHelper.assertCanManageClass(lesson.getLmsClass());
@@ -132,6 +188,11 @@ public class LessonAiServiceImpl implements LessonAiService {
         }
         classAccessHelper.assertCanRead(material.getLesson().getLmsClass());
         return material;
+    }
+
+    private static String stripHtml(String html) {
+        if (html == null) return "";
+        return html.replaceAll("<[^>]*>", " ").replaceAll("&[a-zA-Z]+;", " ").replaceAll("\\s+", " ").trim();
     }
 
     private static MaterialRagStatusPayload toStatusPayload(MaterialRagIndex index) {

@@ -39,8 +39,19 @@ public class QuizSubmission {
     @JoinColumn(name = "student_user_id", referencedColumnName = "uuid", nullable = false)
     private User student;
 
+    /** SUBMITTED | FAILED */
     @Column(nullable = false)
-    private String status = "COMPLETED";
+    private String status = "SUBMITTED";
+
+    @Column
+    private Integer score;
+
+    @Column(name = "fail_reason")
+    private String failReason;
+
+    /** JSON map of {questionId: selectedOptionIndex} */
+    @Column(name = "answers_json", columnDefinition = "TEXT")
+    private String answersJson;
 
     @CreationTimestamp
     @Column(name = "submitted_at")

@@ -1,6 +1,7 @@
 package com.mengsea.khmercodepath.api.classes.controller;
 
 import com.mengsea.khmercodepath.api.classes.payload.AssignStudentsRequest;
+import com.mengsea.khmercodepath.api.classes.payload.ClassConfigPayload;
 import com.mengsea.khmercodepath.api.classes.payload.ClassCommentPayload;
 import com.mengsea.khmercodepath.api.classes.payload.ClassDetailPayload;
 import com.mengsea.khmercodepath.api.classes.payload.ClassInvitationPayload;
@@ -44,6 +45,14 @@ public class ClassManagementController {
     private final ClassManagementService classManagementService;
     private final ClassCommentService classCommentService;
     private final ClassInvitationService classInvitationService;
+
+    @Operation(summary = "CLS-0295 · Classes UI config (tabs, semester filters, gradients)")
+    @GetMapping("/config")
+    @PreAuthorize("hasAuthority('" + LmsAuthority.CLS_READ + "')")
+    public ResponseEntity<ApiResponse<ClassConfigPayload>> getConfig() {
+        ClassConfigPayload data = classManagementService.getClassConfig();
+        return ResponseEntity.ok(ApiResponses.of("CLS-0295", LmsStatusCode.SUCCESS, null, data));
+    }
 
     @Operation(summary = "CLS-0300 · List classes")
     @GetMapping

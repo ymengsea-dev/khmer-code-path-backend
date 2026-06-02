@@ -41,6 +41,7 @@ public final class LmsAuthorities {
             }
             case TEACHER -> {
                 authorities.add(new SimpleGrantedAuthority(LmsAuthority.CLS_READ));
+                authorities.add(new SimpleGrantedAuthority(LmsAuthority.CLS_MANAGE));
                 authorities.add(new SimpleGrantedAuthority(LmsAuthority.CRS_READ));
                 authorities.add(new SimpleGrantedAuthority(LmsAuthority.CRS_MANAGE));
                 authorities.add(new SimpleGrantedAuthority(LmsAuthority.AI_CHAT));

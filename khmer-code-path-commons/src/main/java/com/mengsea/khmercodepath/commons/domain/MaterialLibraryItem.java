@@ -51,6 +51,10 @@ public class MaterialLibraryItem {
     @Column(nullable = false)
     private String gradient = "from-violet-800 to-violet-600";
 
+    /** Teacher-wide file storage (not a lesson template). */
+    @Column(name = "file_pool", nullable = false)
+    private boolean filePool = false;
+
     @Column(nullable = false)
     private boolean deleted = false;
 

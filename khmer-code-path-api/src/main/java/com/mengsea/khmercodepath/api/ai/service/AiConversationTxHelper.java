@@ -41,6 +41,48 @@ class AiConversationTxHelper {
         return all.subList(all.size() - window, all.size());
     }
 
+    /**
+     * Saves the user message and loads the history window (before the new message) in one transaction.
+     * Returns the history to feed into the LLM stream.
+     */
+    @Transactional
+    public List<AiChatMessage> prepareStreamExchange(String conversationId, String userContent) {
+        AiConversation conversation = requireOwnedConversation(conversationId);
+
+        // Load history BEFORE saving the user message to avoid duplicating it in the LLM context.
+        List<AiChatMessage> history = loadHistoryWindow(conversationId);
+
+        AiChatMessage userMessage = new AiChatMessage();
+        userMessage.setConversation(conversation);
+        userMessage.setRole(ChatMessageRole.USER);
+        userMessage.setContent(userContent);
+        messageRepository.save(userMessage);
+
+        return history;
+    }
+
+    /**
+     * Persists the fully-assembled assistant reply after the stream completes.
+     * Does NOT require a security context — ownership was already validated in prepareStreamExchange.
+     */
+    @Transactional
+    public void persistStreamedAssistantMessage(String conversationId, String assistantText, String userContent) {
+        AiConversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new BusinessException(ExceptionCode.AI_CONVERSATION_NOT_FOUND));
+
+        AiChatMessage assistantMessage = new AiChatMessage();
+        assistantMessage.setConversation(conversation);
+        assistantMessage.setRole(ChatMessageRole.ASSISTANT);
+        assistantMessage.setContent(assistantText.isBlank() ? "I could not generate a response. Please try again." : assistantText);
+        messageRepository.save(assistantMessage);
+
+        if (conversation.getTitle() == null || conversation.getTitle().isBlank()
+                || "New conversation".equals(conversation.getTitle())) {
+            conversation.setTitle(truncateTitle(userContent));
+        }
+        conversationRepository.save(conversation);
+    }
+
     @Transactional
     public ChatReplyPayload persistExchange(String conversationId, String userContent, String assistantText) {
         AiConversation conversation = requireOwnedConversation(conversationId);

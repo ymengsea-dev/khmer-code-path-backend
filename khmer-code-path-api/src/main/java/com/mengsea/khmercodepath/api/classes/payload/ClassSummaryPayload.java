@@ -21,6 +21,9 @@ public class ClassSummaryPayload {
     private String semester;
     private Integer academicYear;
     private ClassStatus status;
+    private String statusLabel;
+    private String semesterLabel;
+    private String cardGradient;
     private long enrolledCount;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

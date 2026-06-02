@@ -12,4 +12,7 @@ public interface LessonAiService {
     LessonSummaryGeneratePayload generateSummary(Long lessonId, Long materialId);
 
     QuizGeneratePayload generateQuiz(Long lessonId, GenerateFromMaterialRequest request);
+
+    /** Generate a summary directly from the lesson's description field — no uploaded file needed. */
+    LessonSummaryGeneratePayload generateSummaryFromContent(Long lessonId);
 }

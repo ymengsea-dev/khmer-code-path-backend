@@ -57,6 +57,7 @@ spring:
         index-type: HNSW
 
 lms:
+  uploads-dir: ./build/test-uploads
   storage:
     provider: local
 

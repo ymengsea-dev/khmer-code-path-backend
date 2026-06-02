@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Builder
@@ -16,5 +17,6 @@ public class MaterialLibraryItemPayload {
     private LibraryIconType iconType;
     private String gradient;
     private long assetCount;
+    private List<LibraryMaterialPayload> materials;
     private LocalDateTime updatedAt;
 }

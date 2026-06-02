@@ -34,6 +34,21 @@ public class Quiz {
     @Column(nullable = false)
     private String title;
 
+    @Column(columnDefinition = "TEXT")
+    private String description;
+
+    @Column(name = "generated_content", columnDefinition = "TEXT")
+    private String generatedContent;
+
+    @Column(name = "question_count", nullable = false)
+    private int questionCount = 0;
+
+    @Column(name = "duration_minutes")
+    private Integer durationMinutes;
+
+    @Column(name = "due_at")
+    private LocalDateTime dueAt;
+
     @Column(nullable = false)
     private String status = "PUBLISHED";
 

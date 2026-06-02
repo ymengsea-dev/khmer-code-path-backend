@@ -20,6 +20,10 @@ public enum ExceptionCode {
     UNAUTHORIZED(LmsStatusCode.UNAUTHORIZED, "Token is missing or invalid."),
     ACCESS_DENIED(LmsStatusCode.FORBIDDEN, "You do not have permission to perform this action."),
     VALIDATION_ERROR(LmsStatusCode.VALIDATION_FAILED, "Request validation error"),
+    FILE_STORAGE_FAILED(LmsStatusCode.INTERNAL_SERVER_ERROR,
+            "File storage failed. Ensure MinIO is running and credentials in .env match the MinIO container."),
+    FILE_TOO_LARGE(LmsStatusCode.VALIDATION_FAILED,
+            "File exceeds the maximum upload size (50MB per file)."),
     INTERNAL_SERVER_ERROR(LmsStatusCode.INTERNAL_SERVER_ERROR, "Internal server error"),
     TOKEN_EXPIRED(LmsStatusCode.TOKEN_EXPIRED, "Access token has expired"),
     PASSWORD_RESET_TOKEN_INVALID(LmsStatusCode.BAD_REQUEST, "Password reset token is invalid"),
@@ -54,7 +58,9 @@ public enum ExceptionCode {
             "Material is not indexed for AI. Upload a supported file and try again."),
     MATERIAL_RAG_INDEX_FAILED(LmsStatusCode.INTERNAL_SERVER_ERROR,
             "Failed to index material for AI retrieval"),
-    NOTE_NOT_FOUND(LmsStatusCode.NOT_FOUND, "Note not found");
+    NOTE_NOT_FOUND(LmsStatusCode.NOT_FOUND, "Note not found"),
+    QUIZ_NOT_FOUND(LmsStatusCode.NOT_FOUND, "Quiz not found"),
+    QUIZ_ALREADY_SUBMITTED(LmsStatusCode.OPERATION_NOT_ALLOWED, "You have already submitted this quiz");
 
     private final LmsStatusCode statusCode;
     private final String message;

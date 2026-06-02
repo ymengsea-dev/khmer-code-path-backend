@@ -38,8 +38,8 @@ spring:
 
   servlet:
     multipart:
-      max-file-size: 5MB
-      max-request-size: 5MB
+      max-file-size: 50MB
+      max-request-size: 55MB
 
   data:
     redis:
@@ -81,12 +81,52 @@ jwt:
   refresh-expiration: ${REFRESH_TOKEN_EXPIRATION}
 
 lms:
-  uploads-dir: ${LMS_UPLOADS_DIR:./uploads}
+  # Lesson / library binaries are stored in MinIO only (not on the API server disk).
   storage:
-    provider: ${LMS_STORAGE_PROVIDER:minio}
+    provider: minio
   ai:
     history-window: 20
     ingest-on-startup: false
+  material-library:
+    upload-accept: ".pdf,.pptx,.docx"
+    views:
+      - id: all
+        label: All
+        search-placeholder: Search templates and files…
+      - id: templates
+        label: Templates
+        search-placeholder: Search templates…
+      - id: files
+        label: File attachments
+        search-placeholder: Search file attachments…
+    create-defaults:
+      title: New Lesson Template
+      icon-type: SLIDES
+      gradient: from-violet-800 to-violet-600
+    file-pool:
+      label: Stored files
+      max-files: 100
+  classes:
+    all-semesters-label: All Semesters
+    card-gradients:
+      - from-indigo-500 to-purple-600
+      - from-blue-600 to-sky-700
+      - from-emerald-600 to-teal-700
+      - from-amber-500 to-orange-600
+      - from-rose-500 to-pink-600
+      - from-violet-600 to-fuchsia-700
+    lesson-tabs:
+      - id: content
+        label: Lessons
+      - id: materials
+        label: Materials
+      - id: ai
+        label: AI
+      - id: comments
+        label: Comments
+    create-defaults:
+      semester: Semester 1
+      academic-year: 2026
 
 minio:
   url: ${MINIO_URL}

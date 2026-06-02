@@ -6,7 +6,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.InputStream;
 
 /**
- * Object storage for lesson / library materials (MinIO in production, local disk in tests).
+ * Object storage for lesson / library materials. Runtime uses MinIO; {@code test} profile may use local disk.
  */
 public interface UploadStorage {
 

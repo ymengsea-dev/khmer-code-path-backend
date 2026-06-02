@@ -24,4 +24,8 @@ public interface QuizSubmissionRepository extends JpaRepository<QuizSubmission, 
             ORDER BY s.submittedAt DESC
             """)
     List<QuizSubmission> findByStudentUuidWithQuiz(@Param("studentUuid") String studentUuid);
+
+    java.util.Optional<QuizSubmission> findByQuiz_IdAndStudent_Uuid(Long quizId, String studentUuid);
+
+    boolean existsByQuiz_IdAndStudent_Uuid(Long quizId, String studentUuid);
 }

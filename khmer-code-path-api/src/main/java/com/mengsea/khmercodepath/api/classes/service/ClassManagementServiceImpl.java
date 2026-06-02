@@ -1,10 +1,15 @@
 package com.mengsea.khmercodepath.api.classes.service;
 
+import com.mengsea.khmercodepath.api.classes.config.ClassesProperties;
 import com.mengsea.khmercodepath.api.classes.payload.AssignStudentsRequest;
+import com.mengsea.khmercodepath.api.classes.payload.ClassConfigPayload;
+import com.mengsea.khmercodepath.api.classes.payload.ClassCreateDefaultsPayload;
 import com.mengsea.khmercodepath.api.classes.payload.ClassDetailPayload;
 import com.mengsea.khmercodepath.api.classes.payload.ClassPagePayload;
 import com.mengsea.khmercodepath.api.classes.payload.ClassSummaryPayload;
 import com.mengsea.khmercodepath.api.classes.payload.CreateClassRequest;
+import com.mengsea.khmercodepath.api.classes.payload.LessonTabPayload;
+import com.mengsea.khmercodepath.api.classes.payload.SemesterFilterPayload;
 import com.mengsea.khmercodepath.api.classes.payload.EnrollmentCountsPayload;
 import com.mengsea.khmercodepath.api.classes.payload.LessonsSummaryPayload;
 import com.mengsea.khmercodepath.api.classes.payload.RemoveStudentsRequest;
@@ -32,9 +37,13 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -49,6 +58,28 @@ public class ClassManagementServiceImpl implements ClassManagementService {
     private final UserAdminMapper userAdminMapper;
     private final ClassInvitationService classInvitationService;
     private final ClassAccessHelper classAccessHelper;
+    private final ClassesProperties classesProperties;
+
+    @Override
+    @Transactional(readOnly = true)
+    public ClassConfigPayload getClassConfig() {
+        User me = SecurityUtils.requireCurrentUser();
+        List<SemesterFilterPayload> semesterFilters = buildSemesterFilters(me);
+        List<LessonTabPayload> lessonTabs = classesProperties.getLessonTabs().stream()
+                .map(t -> LessonTabPayload.builder().id(t.getId()).label(t.getLabel()).build())
+                .toList();
+        ClassesProperties.CreateDefaults defs = classesProperties.getCreateDefaults();
+        return ClassConfigPayload.builder()
+                .allSemestersLabel(classesProperties.getAllSemestersLabel())
+                .semesterFilters(semesterFilters)
+                .lessonTabs(lessonTabs)
+                .cardGradients(classesProperties.getCardGradients())
+                .createDefaults(ClassCreateDefaultsPayload.builder()
+                        .semester(defs.getSemester())
+                        .academicYear(defs.getAcademicYear())
+                        .build())
+                .build();
+    }
 
     @Override
     @Transactional(readOnly = true)
@@ -76,9 +107,11 @@ public class ClassManagementServiceImpl implements ClassManagementService {
         }
 
         Page<LmsClass> page = lmsClassRepository.findAll(spec, pageable);
-        List<ClassSummaryPayload> items = page.getContent().stream()
-                .map(this::toSummary)
-                .toList();
+        List<ClassSummaryPayload> items = new ArrayList<>();
+        int index = 0;
+        for (LmsClass entity : page.getContent()) {
+            items.add(toSummary(entity, index++));
+        }
 
         return ClassPagePayload.builder()
                 .items(items)
@@ -101,11 +134,16 @@ public class ClassManagementServiceImpl implements ClassManagementService {
     @Override
     @Transactional
     public ClassDetailPayload createClass(CreateClassRequest request) {
+        User me = SecurityUtils.requireCurrentUser();
         String code = request.getCode().trim();
         if (lmsClassRepository.existsByCodeIgnoreCaseAndDeletedFalse(code)) {
             throw new BusinessException(ExceptionCode.CLASS_CODE_CONFLICT);
         }
-        User teacher = requireTeacherUser(request.getTeacherId().trim());
+        String teacherUuid = request.getTeacherId().trim();
+        if (me.getRole() == Role.TEACHER) {
+            teacherUuid = me.getUuid();
+        }
+        User teacher = requireTeacherUser(teacherUuid);
         LmsClass entity = new LmsClass();
         entity.setCode(code);
         entity.setName(request.getName().trim());
@@ -126,6 +164,8 @@ public class ClassManagementServiceImpl implements ClassManagementService {
     public ClassDetailPayload updateClass(Long id, UpdateClassRequest request) {
         LmsClass entity = lmsClassRepository.findByIdAndDeletedFalse(id)
                 .orElseThrow(() -> new BusinessException(ExceptionCode.CLASS_NOT_FOUND));
+        classAccessHelper.assertCanManageClass(entity);
+        User me = SecurityUtils.requireCurrentUser();
 
         if (request.getCode() != null && !request.getCode().isBlank()) {
             String newCode = request.getCode().trim();
@@ -142,6 +182,9 @@ public class ClassManagementServiceImpl implements ClassManagementService {
             entity.setDescription(blankToNull(request.getDescription()));
         }
         if (request.getTeacherId() != null && !request.getTeacherId().isBlank()) {
+            if (me.getRole() == Role.TEACHER) {
+                throw new BusinessException(ExceptionCode.ACCESS_DENIED);
+            }
             entity.setTeacher(requireTeacherUser(request.getTeacherId().trim()));
         }
         if (request.getSemester() != null) {
@@ -169,6 +212,7 @@ public class ClassManagementServiceImpl implements ClassManagementService {
     public void deleteClass(Long id) {
         LmsClass entity = lmsClassRepository.findByIdAndDeletedFalse(id)
                 .orElseThrow(() -> new BusinessException(ExceptionCode.CLASS_NOT_FOUND));
+        classAccessHelper.assertCanManageClass(entity);
         long enrolled = classEnrollmentRepository.countByLmsClass_Id(id);
         long lessons = lessonRepository.countByLmsClass_IdAndDeletedFalse(id);
         if (enrolled > 0 || lessons > 0) {
@@ -257,9 +301,13 @@ public class ClassManagementServiceImpl implements ClassManagementService {
         return users;
     }
 
-    private ClassSummaryPayload toSummary(LmsClass c) {
+    private ClassSummaryPayload toSummary(LmsClass c, int cardIndex) {
         User t = c.getTeacher();
         long enrolled = classEnrollmentRepository.countByLmsClass_Id(c.getId());
+        List<String> gradients = classesProperties.getCardGradients();
+        String gradient = gradients.isEmpty()
+                ? "from-violet-600 to-fuchsia-700"
+                : gradients.get(Math.floorMod(cardIndex, gradients.size()));
         return ClassSummaryPayload.builder()
                 .id(c.getId())
                 .code(c.getCode())
@@ -268,11 +316,84 @@ public class ClassManagementServiceImpl implements ClassManagementService {
                 .teacherName(t.getUsername())
                 .semester(c.getSemester())
                 .academicYear(c.getAcademicYear())
+                .semesterLabel(formatSemesterLabel(c.getSemester(), c.getAcademicYear()))
                 .status(c.getStatus())
+                .statusLabel(formatStatusLabel(c.getStatus()))
+                .cardGradient(gradient)
                 .enrolledCount(enrolled)
                 .createdAt(c.getCreatedAt())
                 .updatedAt(c.getUpdatedAt())
                 .build();
+    }
+
+    private Specification<LmsClass> visibleClassesSpec(User me) {
+        Specification<LmsClass> spec = Specification.where(LmsClassSpecifications.notDeleted());
+        if (me.getRole() == Role.TEACHER) {
+            spec = spec.and(LmsClassSpecifications.teacherUuidEquals(me.getUuid()));
+        } else if (me.getRole() == Role.STUDENT) {
+            spec = spec.and(LmsClassSpecifications.studentEnrolledEquals(me.getUuid()));
+        }
+        return spec;
+    }
+
+    private List<SemesterFilterPayload> buildSemesterFilters(User me) {
+        String allLabel = classesProperties.getAllSemestersLabel();
+        List<SemesterFilterPayload> filters = new ArrayList<>();
+        filters.add(SemesterFilterPayload.builder()
+                .value(allLabel)
+                .label(allLabel)
+                .build());
+
+        Map<String, SemesterFilterPayload> distinct = new LinkedHashMap<>();
+        List<LmsClass> visible = lmsClassRepository.findAll(visibleClassesSpec(me));
+        for (LmsClass c : visible) {
+            if (c.getSemester() == null || c.getSemester().isBlank()) {
+                continue;
+            }
+            String label = formatSemesterLabel(c.getSemester(), c.getAcademicYear());
+            distinct.putIfAbsent(label, SemesterFilterPayload.builder()
+                    .value(label)
+                    .label(label)
+                    .semester(c.getSemester())
+                    .academicYear(c.getAcademicYear())
+                    .build());
+        }
+        filters.addAll(distinct.values().stream()
+                .sorted(Comparator.comparing(SemesterFilterPayload::getLabel))
+                .toList());
+
+        if (filters.size() == 1) {
+            ClassesProperties.CreateDefaults defs = classesProperties.getCreateDefaults();
+            String label = formatSemesterLabel(defs.getSemester(), defs.getAcademicYear());
+            filters.add(SemesterFilterPayload.builder()
+                    .value(label)
+                    .label(label)
+                    .semester(defs.getSemester())
+                    .academicYear(defs.getAcademicYear())
+                    .build());
+        }
+        return filters;
+    }
+
+    private static String formatSemesterLabel(String semester, Integer academicYear) {
+        if (semester == null || semester.isBlank()) {
+            return academicYear != null ? String.valueOf(academicYear) : "—";
+        }
+        if (academicYear != null) {
+            return semester.trim() + ", " + academicYear;
+        }
+        return semester.trim();
+    }
+
+    private static String formatStatusLabel(ClassStatus status) {
+        if (status == null) {
+            return "Active";
+        }
+        return switch (status) {
+            case ACTIVE -> "Active";
+            case DRAFT -> "Starts Soon";
+            case ARCHIVED -> "Archived";
+        };
     }
 
     private ClassDetailPayload toDetail(LmsClass c) {

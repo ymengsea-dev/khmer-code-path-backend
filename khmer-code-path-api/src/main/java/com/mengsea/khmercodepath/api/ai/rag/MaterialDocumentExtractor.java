@@ -1,6 +1,6 @@
 package com.mengsea.khmercodepath.api.ai.rag;
 
-import com.mengsea.khmercodepath.api.storage.LocalUploadStorage;
+import com.mengsea.khmercodepath.api.storage.MaterialUploadValidator;
 import com.mengsea.khmercodepath.commons.constant.ExceptionCode;
 import com.mengsea.khmercodepath.commons.exception.BusinessException;
 import lombok.extern.slf4j.Slf4j;
@@ -23,10 +23,10 @@ import java.util.List;
 public class MaterialDocumentExtractor {
 
     public List<Document> extract(InputStream inputStream, String fileName) {
-        if (!LocalUploadStorage.isAllowedExtension(fileName)) {
+        if (!MaterialUploadValidator.isAllowedExtension(fileName)) {
             throw new BusinessException(ExceptionCode.VALIDATION_ERROR);
         }
-        String ext = LocalUploadStorage.extension(fileName);
+        String ext = MaterialUploadValidator.extension(fileName);
         return switch (ext) {
             case "pdf" -> extractPdf(inputStream, fileName);
             case "docx", "doc" -> extractDocx(inputStream, fileName);

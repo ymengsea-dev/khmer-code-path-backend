@@ -65,4 +65,13 @@ public class LessonAiController {
         QuizGeneratePayload data = lessonAiService.generateQuiz(lessonId, request);
         return ResponseEntity.ok(ApiResponses.of("QUIZ-0500", LmsStatusCode.SUCCESS, null, data));
     }
+
+    @Operation(summary = "SUM-0601 · Generate lesson summary from written notes (no file needed)")
+    @PostMapping("/summary/from-content")
+    public ResponseEntity<ApiResponse<LessonSummaryGeneratePayload>> generateSummaryFromContent(
+            @PathVariable Long lessonId
+    ) {
+        LessonSummaryGeneratePayload data = lessonAiService.generateSummaryFromContent(lessonId);
+        return ResponseEntity.ok(ApiResponses.of("SUM-0601", LmsStatusCode.SUCCESS, null, data));
+    }
 }

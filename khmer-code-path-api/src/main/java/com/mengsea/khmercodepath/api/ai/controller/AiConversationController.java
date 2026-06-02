@@ -4,6 +4,7 @@ import com.mengsea.khmercodepath.api.ai.payload.ChatMessagePayload;
 import com.mengsea.khmercodepath.api.ai.payload.ChatReplyPayload;
 import com.mengsea.khmercodepath.api.ai.payload.ConversationPayload;
 import com.mengsea.khmercodepath.api.ai.payload.CreateConversationRequest;
+import com.mengsea.khmercodepath.api.ai.payload.RenameConversationRequest;
 import com.mengsea.khmercodepath.api.ai.payload.SendChatMessageRequest;
 import com.mengsea.khmercodepath.api.ai.service.AiConversationService;
 import com.mengsea.khmercodepath.commons.api.ApiResponse;
@@ -19,14 +20,19 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.http.MediaType;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
 
@@ -68,6 +74,16 @@ public class AiConversationController {
         return ResponseEntity.ok(ApiResponses.of("QNA-0702", LmsStatusCode.SUCCESS, null, data));
     }
 
+    @Operation(summary = "QNA-0703S · Stream message (SSE token-by-token)")
+    @PostMapping(value = "/{conversationId}/messages/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public SseEmitter streamMessage(
+            @PathVariable String conversationId,
+            @Valid @RequestBody SendChatMessageRequest request
+    ) {
+        return aiConversationService.streamMessage(conversationId, request.getContent());
+    }
+
     @Operation(summary = "QNA-0703 · Send message (persists user + assistant)")
     @PostMapping("/{conversationId}/messages")
     public ResponseEntity<ApiResponse<ChatReplyPayload>> sendMessage(
@@ -90,5 +106,15 @@ public class AiConversationController {
     public ResponseEntity<ApiResponse<Void>> deleteConversation(@PathVariable String conversationId) {
         aiConversationService.deleteConversation(conversationId);
         return ResponseEntity.ok(ApiResponses.of("QNA-0705", LmsStatusCode.SUCCESS, null, null));
+    }
+
+    @Operation(summary = "QNA-0706 · Rename conversation")
+    @PatchMapping("/{conversationId}")
+    public ResponseEntity<ApiResponse<ConversationPayload>> rename(
+            @PathVariable String conversationId,
+            @Valid @RequestBody RenameConversationRequest request
+    ) {
+        ConversationPayload data = aiConversationService.renameConversation(conversationId, request.getTitle());
+        return ResponseEntity.ok(ApiResponses.of("QNA-0706", LmsStatusCode.SUCCESS, null, data));
     }
 }

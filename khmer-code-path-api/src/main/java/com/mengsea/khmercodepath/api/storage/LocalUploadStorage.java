@@ -4,6 +4,7 @@ import com.mengsea.khmercodepath.commons.constant.ExceptionCode;
 import com.mengsea.khmercodepath.commons.exception.BusinessException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Profile;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.stereotype.Component;
@@ -14,21 +15,22 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.util.Locale;
-import java.util.Set;
 import java.util.UUID;
 
+/**
+ * In-memory test profile only. Runtime uploads use MinIO ({@link MinioUploadStorage}).
+ */
 @Component
+@Profile("test")
 @ConditionalOnProperty(name = "lms.storage.provider", havingValue = "local")
 public class LocalUploadStorage implements UploadStorage {
 
-    private static final long MAX_FILE_BYTES = 50L * 1024 * 1024;
     private static final int MAX_FILES_PER_BATCH = 10;
-    private static final Set<String> ALLOWED_EXT = Set.of("pdf", "pptx", "docx", "ppt", "doc");
 
     private final Path root;
 
-    public LocalUploadStorage(@Value("${lms.uploads-dir:./uploads}") String uploadsDir) throws IOException {
+    public LocalUploadStorage(@Value("${lms.uploads-dir:./build/test-uploads}") String uploadsDir)
+            throws IOException {
         this.root = Path.of(uploadsDir).toAbsolutePath().normalize();
         Files.createDirectories(this.root);
     }
@@ -40,8 +42,8 @@ public class LocalUploadStorage implements UploadStorage {
 
     @Override
     public StoredFile store(String category, Long ownerId, MultipartFile file) {
-        validateFile(file);
-        String safeName = sanitizeFileName(file.getOriginalFilename());
+        MaterialUploadValidator.validateFile(file);
+        String safeName = MaterialUploadValidator.sanitizeFileName(file.getOriginalFilename());
         String key = category + "/" + ownerId + "/" + UUID.randomUUID() + "_" + safeName;
         Path target = root.resolve(key).normalize();
         if (!target.startsWith(root)) {
@@ -51,7 +53,7 @@ public class LocalUploadStorage implements UploadStorage {
             Files.createDirectories(target.getParent());
             Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException ex) {
-            throw new BusinessException(ExceptionCode.INTERNAL_SERVER_ERROR);
+            throw new BusinessException(ExceptionCode.FILE_STORAGE_FAILED);
         }
         return new StoredFile(key, safeName, file.getContentType(), file.getSize());
     }
@@ -113,41 +115,5 @@ public class LocalUploadStorage implements UploadStorage {
         } catch (IOException ex) {
             throw new BusinessException(ExceptionCode.INTERNAL_SERVER_ERROR);
         }
-    }
-
-    public static void validateFile(MultipartFile file) {
-        if (file == null || file.isEmpty()) {
-            throw new BusinessException(ExceptionCode.VALIDATION_ERROR);
-        }
-        if (file.getSize() > MAX_FILE_BYTES) {
-            throw new BusinessException(ExceptionCode.VALIDATION_ERROR);
-        }
-        String name = file.getOriginalFilename();
-        if (name == null || name.isBlank()) {
-            throw new BusinessException(ExceptionCode.VALIDATION_ERROR);
-        }
-        String ext = extension(name);
-        if (!ALLOWED_EXT.contains(ext)) {
-            throw new BusinessException(ExceptionCode.VALIDATION_ERROR);
-        }
-    }
-
-    public static String extension(String name) {
-        int dot = name.lastIndexOf('.');
-        if (dot < 0) {
-            return "";
-        }
-        return name.substring(dot + 1).toLowerCase(Locale.ROOT);
-    }
-
-    static String sanitizeFileName(String name) {
-        if (name == null || name.isBlank()) {
-            return "file";
-        }
-        return name.replaceAll("[^a-zA-Z0-9._-]", "_");
-    }
-
-    public static boolean isAllowedExtension(String fileName) {
-        return ALLOWED_EXT.contains(extension(fileName));
     }
 }

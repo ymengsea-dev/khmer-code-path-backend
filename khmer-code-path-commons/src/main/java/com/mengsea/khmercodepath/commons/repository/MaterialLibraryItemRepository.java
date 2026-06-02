@@ -17,6 +17,7 @@ public interface MaterialLibraryItemRepository extends JpaRepository<MaterialLib
             WHERE i.deleted = false
             AND i.teacher.uuid = :teacherUuid
             AND (:moduleTag IS NULL OR :moduleTag = '' OR LOWER(i.moduleTag) = LOWER(:moduleTag))
+            AND i.filePool = false
             AND (:search IS NULL OR :search = ''
                 OR LOWER(i.title) LIKE LOWER(CONCAT('%', :search, '%'))
                 OR LOWER(COALESCE(i.description, '')) LIKE LOWER(CONCAT('%', :search, '%')))
@@ -31,4 +32,6 @@ public interface MaterialLibraryItemRepository extends JpaRepository<MaterialLib
     Optional<MaterialLibraryItem> findByIdAndDeletedFalse(Long id);
 
     Optional<MaterialLibraryItem> findByIdAndTeacher_UuidAndDeletedFalse(Long id, String teacherUuid);
+
+    Optional<MaterialLibraryItem> findByTeacher_UuidAndFilePoolTrueAndDeletedFalse(String teacherUuid);
 }

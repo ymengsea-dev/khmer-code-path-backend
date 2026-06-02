@@ -95,6 +95,12 @@ public class ApiRequestLoggingFilter extends OncePerRequestFilter {
         if (path == null) {
             return true;
         }
+        // SSE endpoints produce a long-lived streamed response — the ContentCachingResponseWrapper
+        // buffers every write and only flushes when copyBodyToResponse() is called after the filter
+        // chain returns. For async SSE this means chunks are buffered and never forwarded to the client.
+        if (path.endsWith("/stream")) {
+            return false;
+        }
         return !path.startsWith("/swagger-ui")
                 && !path.startsWith("/v3/api-docs")
                 && !path.startsWith("/swagger-ui.html")

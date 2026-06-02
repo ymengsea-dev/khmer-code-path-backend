@@ -49,7 +49,11 @@ public class MinioConfig {
                     log.info("Created MinIO bucket: {}", bucket);
                 }
             } catch (Exception ex) {
-                log.warn("Could not verify MinIO bucket (is MinIO running?): {}", ex.getMessage());
+                String msg =
+                        "MinIO is required for file storage. Start docker compose service 'storage' "
+                                + "and set MINIO_URL, MINIO_ACCESS_KEY, MINIO_SECRET_KEY, MINIO_BUCKET_NAME in .env.";
+                log.error(msg);
+                throw new MinioStorageStartupException(msg, ex);
             }
         }
     }

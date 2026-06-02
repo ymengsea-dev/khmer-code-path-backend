@@ -33,6 +33,23 @@ spring:
               model: ${OPTION_MODEL:text-embedding-004}
               dimensions: 768
 
+  material-library:
+    upload-accept: ".pdf,.pptx,.docx"
+    views:
+      - id: all
+        label: All
+        search-placeholder: Search templates and files…
+      - id: templates
+        label: Templates
+        search-placeholder: Search templates…
+      - id: files
+        label: File attachments
+        search-placeholder: Search file attachments…
+    create-defaults:
+      title: New Lesson Template
+      icon-type: SLIDES
+      gradient: from-violet-800 to-violet-600
+
 jwt:
   secret: ${JWT_SECRET:YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY3ODkwMTIzNA==}
   expiration: ${TOKEN_EXPIRATION:1h}

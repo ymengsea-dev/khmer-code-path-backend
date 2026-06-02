@@ -2,6 +2,7 @@ package com.mengsea.khmercodepath.commons.exception;
 
 import com.mengsea.khmercodepath.commons.api.ApiResponse;
 import com.mengsea.khmercodepath.commons.api.ApiResponses;
+import com.mengsea.khmercodepath.commons.constant.ExceptionCode;
 import com.mengsea.khmercodepath.commons.constant.LmsStatusCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,6 +14,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -60,6 +62,18 @@ public class GlobalExceptionHandler {
                 errors
         );
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(body);
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMaxUploadSize(MaxUploadSizeExceededException ex) {
+        log.warn("Upload size limit exceeded: {}", ex.getMessage());
+        ApiResponse<Void> body = ApiResponses.of(
+                "SYS-1002",
+                ExceptionCode.FILE_TOO_LARGE.getStatusCode(),
+                ExceptionCode.FILE_TOO_LARGE.getMessage(),
+                null
+        );
+        return ResponseEntity.status(ExceptionCode.FILE_TOO_LARGE.getHttpStatus()).body(body);
     }
 
     @ExceptionHandler(BadCredentialsException.class)
