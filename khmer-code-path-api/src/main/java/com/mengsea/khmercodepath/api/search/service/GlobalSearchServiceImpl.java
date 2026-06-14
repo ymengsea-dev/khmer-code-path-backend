@@ -1,6 +1,7 @@
 package com.mengsea.khmercodepath.api.search.service;
 
 import com.mengsea.khmercodepath.api.search.payload.GlobalSearchResultPayload;
+import com.mengsea.khmercodepath.api.search.payload.GlobalSearchScopePayload;
 import com.mengsea.khmercodepath.commons.constant.Role;
 import com.mengsea.khmercodepath.commons.domain.Lesson;
 import com.mengsea.khmercodepath.commons.domain.LmsClass;
@@ -22,24 +23,67 @@ import java.util.Map;
 public class GlobalSearchServiceImpl implements GlobalSearchService {
 
     private static final int LIMIT_PER_TYPE = 5;
+    private static final String SCOPE_ALL = "all";
+    private static final String SCOPE_CLASS = "class";
+    private static final String SCOPE_LESSON = "lesson";
+    private static final String SCOPE_QUIZ = "quiz";
+    private static final String SCOPE_NOTEBOOK = "notebook";
 
     private final EntityManager entityManager;
 
     @Override
+    public List<GlobalSearchScopePayload> scopes() {
+        User me = SecurityUtils.requireCurrentUser();
+        boolean isStudent = me.getRole() == Role.STUDENT;
+
+        List<GlobalSearchScopePayload> list = new ArrayList<>();
+        list.add(GlobalSearchScopePayload.builder()
+                .id(SCOPE_ALL).label("All").placeholder("Spotlight Search").icon("search").build());
+        list.add(GlobalSearchScopePayload.builder()
+                .id(SCOPE_CLASS).label("Class").placeholder("Search class").icon("graduation-cap").build());
+        if (!isStudent) {
+            list.add(GlobalSearchScopePayload.builder()
+                    .id(SCOPE_LESSON).label("Lesson").placeholder("Search lesson").icon("book-open").build());
+        }
+        list.add(GlobalSearchScopePayload.builder()
+                .id(SCOPE_QUIZ).label("Quiz").placeholder("Search quiz").icon("file-question").build());
+        list.add(GlobalSearchScopePayload.builder()
+                .id(SCOPE_NOTEBOOK).label("Notebook").placeholder("Search notebook").icon("notebook-pen").build());
+        return list;
+    }
+
+    @Override
     @Transactional(readOnly = true)
-    public List<GlobalSearchResultPayload> search(String query) {
+    public List<GlobalSearchResultPayload> search(String query, String scope) {
         String trimmed = query == null ? "" : query.trim();
         if (trimmed.length() < 2) {
             return List.of();
         }
         User me = SecurityUtils.requireCurrentUser();
         String pattern = "%" + trimmed.toLowerCase() + "%";
+        String normalizedScope = normalizeScope(scope);
         List<GlobalSearchResultPayload> results = new ArrayList<>();
-        results.addAll(searchClasses(me, pattern));
-        results.addAll(searchLessons(me, pattern));
-        results.addAll(searchQuizzes(me, pattern));
-        results.addAll(searchNotes(me, pattern));
+        if (SCOPE_ALL.equals(normalizedScope) || SCOPE_CLASS.equals(normalizedScope)) {
+            results.addAll(searchClasses(me, pattern));
+        }
+        if (SCOPE_ALL.equals(normalizedScope) || SCOPE_LESSON.equals(normalizedScope)) {
+            results.addAll(searchLessons(me, pattern));
+        }
+        if (SCOPE_ALL.equals(normalizedScope) || SCOPE_QUIZ.equals(normalizedScope)) {
+            results.addAll(searchQuizzes(me, pattern));
+        }
+        if (SCOPE_ALL.equals(normalizedScope) || SCOPE_NOTEBOOK.equals(normalizedScope)) {
+            results.addAll(searchNotes(me, pattern));
+        }
         return results;
+    }
+
+    private String normalizeScope(String scope) {
+        String normalized = scope == null ? SCOPE_ALL : scope.trim().toLowerCase();
+        return switch (normalized) {
+            case SCOPE_CLASS, SCOPE_LESSON, SCOPE_QUIZ, SCOPE_NOTEBOOK -> normalized;
+            default -> SCOPE_ALL;
+        };
     }
 
     private List<GlobalSearchResultPayload> searchClasses(User me, String pattern) {

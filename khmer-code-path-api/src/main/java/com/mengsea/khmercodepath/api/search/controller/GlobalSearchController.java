@@ -1,6 +1,7 @@
 package com.mengsea.khmercodepath.api.search.controller;
 
 import com.mengsea.khmercodepath.api.search.payload.GlobalSearchResultPayload;
+import com.mengsea.khmercodepath.api.search.payload.GlobalSearchScopePayload;
 import com.mengsea.khmercodepath.api.search.service.GlobalSearchService;
 import com.mengsea.khmercodepath.commons.api.ApiResponse;
 import com.mengsea.khmercodepath.commons.api.ApiResponses;
@@ -30,9 +31,16 @@ public class GlobalSearchController {
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<GlobalSearchResultPayload>>> search(
-            @RequestParam String q
+            @RequestParam String q,
+            @RequestParam(required = false) String scope
     ) {
-        List<GlobalSearchResultPayload> data = globalSearchService.search(q);
+        List<GlobalSearchResultPayload> data = globalSearchService.search(q, scope);
         return ResponseEntity.ok(ApiResponses.of("SRCH-0100", LmsStatusCode.SUCCESS, null, data));
+    }
+
+    @GetMapping("/scopes")
+    public ResponseEntity<ApiResponse<List<GlobalSearchScopePayload>>> scopes() {
+        List<GlobalSearchScopePayload> data = globalSearchService.scopes();
+        return ResponseEntity.ok(ApiResponses.of("SRCH-0101", LmsStatusCode.SUCCESS, null, data));
     }
 }
