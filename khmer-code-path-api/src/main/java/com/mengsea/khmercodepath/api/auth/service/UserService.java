@@ -14,6 +14,10 @@ public interface UserService {
 
     UserResponse me(String email);
 
+    UserResponse updateProfile(String email, String userName);
+
+    void changePassword(String email, String currentPassword, String newPassword);
+
     void requestPasswordReset(String email);
 
     void confirmPasswordReset(String token, String newPassword);

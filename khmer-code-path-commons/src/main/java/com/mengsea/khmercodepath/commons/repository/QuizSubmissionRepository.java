@@ -12,7 +12,7 @@ public interface QuizSubmissionRepository extends JpaRepository<QuizSubmission, 
     @Query("""
             SELECT COUNT(s) FROM QuizSubmission s
             WHERE s.student.uuid = :studentUuid
-            AND s.status = 'COMPLETED'
+            AND s.status IN ('SUBMITTED', 'COMPLETED')
             """)
     long countCompletedByStudentUuid(@Param("studentUuid") String studentUuid);
 
@@ -28,4 +28,24 @@ public interface QuizSubmissionRepository extends JpaRepository<QuizSubmission, 
     java.util.Optional<QuizSubmission> findByQuiz_IdAndStudent_Uuid(Long quizId, String studentUuid);
 
     boolean existsByQuiz_IdAndStudent_Uuid(Long quizId, String studentUuid);
+
+    long countByQuiz_Id(Long quizId);
+
+    long countByQuiz_IdAndStatus(Long quizId, String status);
+
+    @Query("""
+            SELECT COUNT(s) FROM QuizSubmission s
+            WHERE s.quiz.id = :quizId
+            AND s.status IN ('SUBMITTED', 'COMPLETED')
+            """)
+    long countSubmittedByQuizId(@Param("quizId") Long quizId);
+
+    @Query("""
+            SELECT s FROM QuizSubmission s
+            JOIN FETCH s.student
+            JOIN FETCH s.quiz q
+            WHERE q.id = :quizId
+            ORDER BY s.submittedAt DESC
+            """)
+    List<QuizSubmission> findByQuizIdWithStudent(@Param("quizId") Long quizId);
 }

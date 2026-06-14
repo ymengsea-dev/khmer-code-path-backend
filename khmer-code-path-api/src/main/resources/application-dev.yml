@@ -49,6 +49,8 @@ spring:
       title: New Lesson Template
       icon-type: SLIDES
       gradient: from-violet-800 to-violet-600
+  jpa:
+    show-sql: ${SHOW_SQL:false}
 
 jwt:
   secret: ${JWT_SECRET:YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY3ODkwMTIzNA==}

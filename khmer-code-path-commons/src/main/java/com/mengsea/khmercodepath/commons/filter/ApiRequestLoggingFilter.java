@@ -68,12 +68,19 @@ public class ApiRequestLoggingFilter extends OncePerRequestFilter {
             int status = cachingResponse.getStatus();
             String user = resolveUser();
             String outcome = failure != null ? "ERROR" : (status >= 200 && status < 400 ? "OK" : "FAIL");
+            String path = cachingRequest.getRequestURI();
+            String queryPart = StringUtils.hasText(cachingRequest.getQueryString())
+                    ? "?" + cachingRequest.getQueryString()
+                    : "";
 
             String reqBody = extractRequestPayload(cachingRequest);
             String respBody = extractResponsePayload(cachingResponse);
 
             log.info(
-                    "HTTP api user={} outcome={} status={} durationMs={} reqBody={} respBody={}",
+                    "HTTP api method={} path={}{} user={} outcome={} status={} durationMs={} reqBody={} respBody={}",
+                    cachingRequest.getMethod(),
+                    path,
+                    queryPart,
                     user,
                     outcome,
                     status,

@@ -3,7 +3,9 @@ package com.mengsea.khmercodepath.api.quiz.service;
 import com.mengsea.khmercodepath.api.quiz.payload.PublishQuizRequest;
 import com.mengsea.khmercodepath.api.quiz.payload.QuizAttemptResultDto;
 import com.mengsea.khmercodepath.api.quiz.payload.QuizDto;
+import com.mengsea.khmercodepath.api.quiz.payload.QuizResultsDto;
 import com.mengsea.khmercodepath.api.quiz.payload.SubmitAnswersRequest;
+import com.mengsea.khmercodepath.api.quiz.payload.UpdateQuizRequest;
 
 import java.util.List;
 
@@ -29,4 +31,10 @@ public interface QuizService {
 
     /** Teacher soft-deletes a quiz they own. */
     void deleteQuiz(Long quizId);
+
+    /** Teacher reviews quiz submissions and aggregate results. */
+    QuizResultsDto getResults(Long quizId);
+
+    /** Teacher edits a quiz before any student attempts exist. */
+    QuizDto updateQuiz(Long quizId, UpdateQuizRequest request);
 }

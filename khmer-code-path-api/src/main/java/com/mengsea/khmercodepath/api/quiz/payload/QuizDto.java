@@ -25,4 +25,8 @@ public class QuizDto {
     String submissionStatus;
     /** Raw generated JSON — included only when a teacher fetches a single quiz (for republishing). */
     String generatedContent;
+    /** Teacher list/review counters. */
+    Long enrolledStudents;
+    Long submittedCount;
+    Long failedCount;
 }

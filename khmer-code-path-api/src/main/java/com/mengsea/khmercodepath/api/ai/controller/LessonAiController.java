@@ -1,6 +1,10 @@
 package com.mengsea.khmercodepath.api.ai.controller;
 
 import com.mengsea.khmercodepath.api.ai.payload.GenerateFromMaterialRequest;
+import com.mengsea.khmercodepath.api.ai.payload.LessonAnswerPayload;
+import com.mengsea.khmercodepath.api.ai.payload.LessonAskRequest;
+import com.mengsea.khmercodepath.api.ai.payload.LessonImprovePayload;
+import com.mengsea.khmercodepath.api.ai.payload.LessonImproveRequest;
 import com.mengsea.khmercodepath.api.ai.payload.LessonSummaryGeneratePayload;
 import com.mengsea.khmercodepath.api.ai.payload.MaterialRagStatusPayload;
 import com.mengsea.khmercodepath.api.ai.payload.QuizGeneratePayload;
@@ -45,6 +49,17 @@ public class LessonAiController {
         return ResponseEntity.ok(ApiResponses.of("LSN-0455", LmsStatusCode.SUCCESS, null, data));
     }
 
+    @Operation(summary = "Queue RAG indexing for a lesson material")
+    @PostMapping("/materials/{materialId}/rag/index")
+    @PreAuthorize("hasAuthority('" + LmsAuthority.AI_INGEST + "')")
+    public ResponseEntity<ApiResponse<MaterialRagStatusPayload>> queueRagIndex(
+            @PathVariable Long lessonId,
+            @PathVariable Long materialId
+    ) {
+        MaterialRagStatusPayload data = lessonAiService.queueMaterialIndex(lessonId, materialId);
+        return ResponseEntity.ok(ApiResponses.of("LSN-0456", LmsStatusCode.SUCCESS, null, data));
+    }
+
     @Operation(summary = "SUM-0600 · Generate lesson summary from a specific material (on-demand RAG)")
     @PostMapping("/summary")
     public ResponseEntity<ApiResponse<LessonSummaryGeneratePayload>> generateSummary(
@@ -73,5 +88,30 @@ public class LessonAiController {
     ) {
         LessonSummaryGeneratePayload data = lessonAiService.generateSummaryFromContent(lessonId);
         return ResponseEntity.ok(ApiResponses.of("SUM-0601", LmsStatusCode.SUCCESS, null, data));
+    }
+
+    @Operation(summary = "Ask a lesson question with cited sources")
+    @PostMapping("/ask")
+    public ResponseEntity<ApiResponse<LessonAnswerPayload>> askWithCitations(
+            @PathVariable Long lessonId,
+            @Valid @RequestBody LessonAskRequest request
+    ) {
+        LessonAnswerPayload data = lessonAiService.answerWithCitations(
+                lessonId,
+                request.getMaterialId(),
+                request.getQuestion()
+        );
+        return ResponseEntity.ok(ApiResponses.of("QNA-0710", LmsStatusCode.SUCCESS, null, data));
+    }
+
+    @Operation(summary = "Improve lesson content with AI")
+    @PostMapping("/improve")
+    @PreAuthorize("hasAuthority('" + LmsAuthority.AI_INGEST + "')")
+    public ResponseEntity<ApiResponse<LessonImprovePayload>> improveLesson(
+            @PathVariable Long lessonId,
+            @Valid @RequestBody LessonImproveRequest request
+    ) {
+        LessonImprovePayload data = lessonAiService.improveLesson(lessonId, request);
+        return ResponseEntity.ok(ApiResponses.of("LSN-0460", LmsStatusCode.SUCCESS, null, data));
     }
 }

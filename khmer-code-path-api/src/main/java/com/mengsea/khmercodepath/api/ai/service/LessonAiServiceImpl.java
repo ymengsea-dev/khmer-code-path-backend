@@ -2,9 +2,14 @@ package com.mengsea.khmercodepath.api.ai.service;
 
 import com.mengsea.khmercodepath.api.ai.gateway.LlmGateway;
 import com.mengsea.khmercodepath.api.ai.payload.GenerateFromMaterialRequest;
+import com.mengsea.khmercodepath.api.ai.payload.LessonAnswerPayload;
+import com.mengsea.khmercodepath.api.ai.payload.LessonCitationPayload;
+import com.mengsea.khmercodepath.api.ai.payload.LessonImprovePayload;
+import com.mengsea.khmercodepath.api.ai.payload.LessonImproveRequest;
 import com.mengsea.khmercodepath.api.ai.payload.LessonSummaryGeneratePayload;
 import com.mengsea.khmercodepath.api.ai.payload.MaterialRagStatusPayload;
 import com.mengsea.khmercodepath.api.ai.payload.QuizGeneratePayload;
+import com.mengsea.khmercodepath.api.ai.rag.MaterialRagMetadata;
 import com.mengsea.khmercodepath.api.ai.rag.MaterialRagVectorService;
 import com.mengsea.khmercodepath.commons.constant.ExceptionCode;
 import com.mengsea.khmercodepath.commons.constant.MaterialSourceType;
@@ -16,10 +21,15 @@ import com.mengsea.khmercodepath.commons.repository.LessonMaterialRepository;
 import com.mengsea.khmercodepath.commons.repository.LessonRepository;
 import com.mengsea.khmercodepath.commons.security.ClassAccessHelper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.ai.document.Document;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -36,6 +46,16 @@ public class LessonAiServiceImpl implements LessonAiService {
     public MaterialRagStatusPayload getMaterialRagStatus(Long lessonId, Long materialId) {
         LessonMaterial material = requireLessonMaterial(lessonId, materialId);
         MaterialRagIndex index = materialRagVectorService.getIndexStatus(
+                MaterialSourceType.LESSON_MATERIAL, material.getId());
+        return toStatusPayload(index);
+    }
+
+    @Override
+    @Transactional
+    public MaterialRagStatusPayload queueMaterialIndex(Long lessonId, Long materialId) {
+        Lesson lesson = requireManageableLesson(lessonId);
+        LessonMaterial material = requireLessonMaterial(lesson.getId(), materialId);
+        MaterialRagIndex index = materialRagVectorService.queueIndex(
                 MaterialSourceType.LESSON_MATERIAL, material.getId());
         return toStatusPayload(index);
     }
@@ -167,6 +187,92 @@ public class LessonAiServiceImpl implements LessonAiService {
                 .build();
     }
 
+    @Override
+    @Transactional
+    public LessonAnswerPayload answerWithCitations(Long lessonId, Long materialId, String question) {
+        Lesson lesson = requireReadableLesson(lessonId);
+        String trimmedQuestion = question == null ? "" : question.trim();
+        if (trimmedQuestion.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Question is required.");
+        }
+
+        List<LessonCitationPayload> citations = new ArrayList<>();
+        String context;
+        if (materialId != null) {
+            LessonMaterial material = requireLessonMaterial(lessonId, materialId);
+            List<Document> chunks = materialRagVectorService.searchMaterial(
+                    MaterialSourceType.LESSON_MATERIAL,
+                    material.getId(),
+                    trimmedQuestion,
+                    5
+            );
+            context = chunksToContext(chunks);
+            citations.addAll(chunks.stream()
+                    .map(chunk -> toCitation(chunk, material.getId(), material.getFileName()))
+                    .toList());
+        } else {
+            String plainText = stripHtml(lesson.getDescription());
+            if (plainText.isBlank()) {
+                throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                        "This lesson has no written notes to cite.");
+            }
+            context = plainText;
+            citations.add(LessonCitationPayload.builder()
+                    .sourceType("LESSON_NOTES")
+                    .materialId(null)
+                    .sourceName(lesson.getTitle() + " notes")
+                    .chunkIndex(null)
+                    .excerpt(truncate(plainText, 600))
+                    .build());
+        }
+
+        String prompt = """
+                Answer the student's question using only the cited lesson context.
+                If the answer is not in the context, say the lesson does not cover it clearly.
+                Keep the answer concise and student-friendly.
+
+                Question: %s
+                """.formatted(trimmedQuestion);
+        String answer = llmGateway.completeWithContent(prompt, context);
+        return LessonAnswerPayload.builder()
+                .lessonId(lessonId)
+                .answer(answer)
+                .citations(citations)
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public LessonImprovePayload improveLesson(Long lessonId, LessonImproveRequest request) {
+        Lesson lesson = requireManageableLesson(lessonId);
+        String plainText = stripHtml(lesson.getDescription());
+        if (plainText.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "This lesson has no written notes to improve.");
+        }
+
+        String goal = request.getGoal() == null || request.getGoal().isBlank()
+                ? "Improve clarity, add objectives, examples, and short practice exercises."
+                : request.getGoal().trim();
+        String prompt = """
+                You are helping a teacher improve lesson content.
+                Rewrite the lesson in clean HTML with headings, short paragraphs, examples, and practice exercises.
+                Preserve the original meaning. Do not invent advanced topics unrelated to the lesson.
+                Teacher goal: %s
+                """.formatted(goal);
+        String improved = llmGateway.completeWithContent(prompt, plainText);
+        boolean persisted = request.isPersist();
+        if (persisted) {
+            lesson.setDescription(improved);
+            lessonRepository.save(lesson);
+        }
+        return LessonImprovePayload.builder()
+                .lessonId(lessonId)
+                .improvedContent(improved)
+                .persisted(persisted)
+                .build();
+    }
+
     private Lesson requireManageableLesson(Long lessonId) {
         Lesson lesson = requireReadableLesson(lessonId);
         classAccessHelper.assertCanManageClass(lesson.getLmsClass());
@@ -193,6 +299,37 @@ public class LessonAiServiceImpl implements LessonAiService {
     private static String stripHtml(String html) {
         if (html == null) return "";
         return html.replaceAll("<[^>]*>", " ").replaceAll("&[a-zA-Z]+;", " ").replaceAll("\\s+", " ").trim();
+    }
+
+    private static String chunksToContext(List<Document> chunks) {
+        return chunks.stream()
+                .map(chunk -> {
+                    Map<String, Object> metadata = chunk.getMetadata();
+                    Object sourceName = metadata.get(MaterialRagMetadata.FILE_NAME);
+                    Object chunkIndex = metadata.get(MaterialRagMetadata.CHUNK_INDEX);
+                    return "[%s chunk %s]\n%s".formatted(sourceName, chunkIndex, chunk.getText());
+                })
+                .reduce("", (left, right) -> left + "\n\n" + right);
+    }
+
+    private static LessonCitationPayload toCitation(Document chunk, Long materialId, String fallbackFileName) {
+        Map<String, Object> metadata = chunk.getMetadata();
+        Object chunkIndex = metadata.get(MaterialRagMetadata.CHUNK_INDEX);
+        return LessonCitationPayload.builder()
+                .sourceType("LESSON_MATERIAL")
+                .materialId(materialId)
+                .sourceName(String.valueOf(metadata.getOrDefault(MaterialRagMetadata.FILE_NAME, fallbackFileName)))
+                .chunkIndex(chunkIndex instanceof Number n ? n.intValue() : null)
+                .excerpt(truncate(chunk.getText(), 600))
+                .build();
+    }
+
+    private static String truncate(String text, int maxLength) {
+        if (text == null) {
+            return "";
+        }
+        String cleaned = text.replaceAll("\\s+", " ").trim();
+        return cleaned.length() <= maxLength ? cleaned : cleaned.substring(0, maxLength - 3) + "...";
     }
 
     private static MaterialRagStatusPayload toStatusPayload(MaterialRagIndex index) {

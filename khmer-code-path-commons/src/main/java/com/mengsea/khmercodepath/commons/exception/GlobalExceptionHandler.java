@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -82,6 +83,17 @@ public class GlobalExceptionHandler {
                 "SYS-2000",
                 LmsStatusCode.UNAUTHORIZED,
                 "Invalid email or password",
+                null
+        );
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(body);
+    }
+
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAuthenticationException(AuthenticationException ex) {
+        ApiResponse<Void> body = ApiResponses.of(
+                "SYS-2001",
+                LmsStatusCode.UNAUTHORIZED,
+                "Authentication required",
                 null
         );
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(body);

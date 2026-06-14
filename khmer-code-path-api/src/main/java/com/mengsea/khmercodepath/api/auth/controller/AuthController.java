@@ -1,11 +1,13 @@
 package com.mengsea.khmercodepath.api.auth.controller;
 
 import com.mengsea.khmercodepath.api.auth.payload.AuthResponse;
+import com.mengsea.khmercodepath.api.auth.payload.ChangePasswordRequest;
 import com.mengsea.khmercodepath.api.auth.payload.LoginRequest;
 import com.mengsea.khmercodepath.api.auth.payload.PasswordResetConfirmRequest;
 import com.mengsea.khmercodepath.api.auth.payload.PasswordResetRequest;
 import com.mengsea.khmercodepath.api.auth.payload.RefreshTokenRequest;
 import com.mengsea.khmercodepath.api.auth.payload.RegisterRequest;
+import com.mengsea.khmercodepath.api.auth.payload.UpdateProfileRequest;
 import com.mengsea.khmercodepath.api.auth.payload.UserResponse;
 import com.mengsea.khmercodepath.api.auth.service.UserService;
 import com.mengsea.khmercodepath.commons.api.ApiResponse;
@@ -25,6 +27,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -89,6 +92,39 @@ public class AuthController {
     public ResponseEntity<ApiResponse<UserResponse>> me(Authentication authentication) {
         UserResponse me = userService.me(authentication.getName());
         ApiResponse<UserResponse> body = ApiResponses.of("AUTH-0130", LmsStatusCode.SUCCESS, null, me);
+        return ResponseEntity.ok(body);
+    }
+
+    @PatchMapping("/me")
+    @PreAuthorize("isAuthenticated()")
+    @SecurityRequirement(name = SwaggerConfig.SECURITY_SCHEME_NAME)
+    public ResponseEntity<ApiResponse<UserResponse>> updateProfile(
+            Authentication authentication,
+            @Valid @RequestBody UpdateProfileRequest request
+    ) {
+        UserResponse me = userService.updateProfile(authentication.getName(), request.getUserName());
+        ApiResponse<UserResponse> body = ApiResponses.of("AUTH-0131", LmsStatusCode.SUCCESS, null, me);
+        return ResponseEntity.ok(body);
+    }
+
+    @PostMapping("/me/password")
+    @PreAuthorize("isAuthenticated()")
+    @SecurityRequirement(name = SwaggerConfig.SECURITY_SCHEME_NAME)
+    public ResponseEntity<ApiResponse<Void>> changePassword(
+            Authentication authentication,
+            @Valid @RequestBody ChangePasswordRequest request
+    ) {
+        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
+            ApiResponse<Void> body = ApiResponses.of(
+                    "AUTH-0132",
+                    LmsStatusCode.VALIDATION_FAILED,
+                    "confirmPassword does not match newPassword",
+                    null
+            );
+            return ResponseEntity.unprocessableEntity().body(body);
+        }
+        userService.changePassword(authentication.getName(), request.getCurrentPassword(), request.getNewPassword());
+        ApiResponse<Void> body = ApiResponses.of("AUTH-0132", LmsStatusCode.SUCCESS, null, null);
         return ResponseEntity.ok(body);
     }
 

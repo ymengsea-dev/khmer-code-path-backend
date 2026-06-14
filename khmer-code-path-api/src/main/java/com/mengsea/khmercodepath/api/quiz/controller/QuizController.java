@@ -3,7 +3,9 @@ package com.mengsea.khmercodepath.api.quiz.controller;
 import com.mengsea.khmercodepath.api.quiz.payload.PublishQuizRequest;
 import com.mengsea.khmercodepath.api.quiz.payload.QuizAttemptResultDto;
 import com.mengsea.khmercodepath.api.quiz.payload.QuizDto;
+import com.mengsea.khmercodepath.api.quiz.payload.QuizResultsDto;
 import com.mengsea.khmercodepath.api.quiz.payload.SubmitAnswersRequest;
+import com.mengsea.khmercodepath.api.quiz.payload.UpdateQuizRequest;
 import com.mengsea.khmercodepath.api.quiz.service.QuizService;
 import com.mengsea.khmercodepath.commons.api.ApiResponse;
 import com.mengsea.khmercodepath.commons.api.ApiResponses;
@@ -22,6 +24,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -73,6 +76,25 @@ public class QuizController {
     public ResponseEntity<ApiResponse<QuizDto>> getQuiz(@PathVariable Long id) {
         QuizDto data = quizService.getQuiz(id);
         return ResponseEntity.ok(ApiResponses.of("QUIZ-0603", LmsStatusCode.SUCCESS, null, data));
+    }
+
+    @Operation(summary = "QUIZ-0607 · Teacher reviews quiz submissions and results")
+    @GetMapping("/{id}/results")
+    @PreAuthorize("hasAuthority('" + LmsAuthority.LSN_MANAGE + "')")
+    public ResponseEntity<ApiResponse<QuizResultsDto>> getResults(@PathVariable Long id) {
+        QuizResultsDto data = quizService.getResults(id);
+        return ResponseEntity.ok(ApiResponses.of("QUIZ-0607", LmsStatusCode.SUCCESS, null, data));
+    }
+
+    @Operation(summary = "QUIZ-0608 · Teacher updates a quiz before student attempts")
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('" + LmsAuthority.LSN_MANAGE + "')")
+    public ResponseEntity<ApiResponse<QuizDto>> updateQuiz(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateQuizRequest request
+    ) {
+        QuizDto data = quizService.updateQuiz(id, request);
+        return ResponseEntity.ok(ApiResponses.of("QUIZ-0608", LmsStatusCode.SUCCESS, null, data));
     }
 
     @Operation(summary = "QUIZ-0604 · Student submits answers")

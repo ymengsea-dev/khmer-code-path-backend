@@ -16,6 +16,9 @@ import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.ai.vectorstore.filter.Filter;
 import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,11 +36,14 @@ import java.util.Map;
 @Slf4j
 public class MaterialRagVectorService {
 
+    private static final String INDEX_QUEUE_KEY = "khmer-code-path:material-rag:index-queue";
+
     private final MaterialRagIndexRepository ragIndexRepository;
     private final UploadStorage uploadStorage;
     private final MaterialDocumentExtractor documentExtractor;
     private final VectorStore vectorStore;
     private final LlmGateway llmGateway;
+    private final ObjectProvider<StringRedisTemplate> redisTemplateProvider;
 
     @Transactional
     public MaterialRagIndex registerLessonMaterial(
@@ -144,17 +150,55 @@ public class MaterialRagVectorService {
         return ragIndexRepository.save(index);
     }
 
+    @Transactional
+    public MaterialRagIndex queueIndex(MaterialSourceType sourceType, Long sourceId) {
+        MaterialRagIndex index = ragIndexRepository.findBySourceTypeAndSourceId(sourceType, sourceId)
+                .orElseThrow(() -> new BusinessException(ExceptionCode.MATERIAL_NOT_FOUND));
+        if (index.getStatus() == RagIndexStatus.READY || index.getStatus() == RagIndexStatus.INDEXING) {
+            return index;
+        }
+        index.setStatus(RagIndexStatus.QUEUED);
+        index.setErrorMessage(null);
+        ragIndexRepository.save(index);
+        StringRedisTemplate redisTemplate = redisTemplateProvider.getIfAvailable();
+        if (redisTemplate != null) {
+            redisTemplate.opsForList().rightPush(INDEX_QUEUE_KEY, sourceType.name() + ":" + sourceId);
+        } else {
+            Thread.ofVirtual().start(() -> ensureIndexed(sourceType, sourceId));
+        }
+        return index;
+    }
+
+    @Scheduled(fixedDelayString = "${lms.ai.index-queue-delay-ms:5000}")
+    public void processQueuedIndexJob() {
+        StringRedisTemplate redisTemplate = redisTemplateProvider.getIfAvailable();
+        if (redisTemplate == null) {
+            return;
+        }
+        String job = redisTemplate.opsForList().leftPop(INDEX_QUEUE_KEY);
+        if (job == null || job.isBlank()) {
+            return;
+        }
+        String[] parts = job.split(":", 2);
+        if (parts.length != 2) {
+            log.warn("Skipping malformed material RAG index job: {}", job);
+            return;
+        }
+        try {
+            ensureIndexed(MaterialSourceType.valueOf(parts[0]), Long.valueOf(parts[1]));
+        } catch (Exception ex) {
+            log.warn("Queued material RAG index job failed: {}", job, ex);
+        }
+    }
+
     public String queryMaterial(MaterialSourceType sourceType, Long sourceId, String question, int topK) {
-        ensureIndexed(sourceType, sourceId);
-        Filter.Expression filter = new FilterExpressionBuilder()
-                .eq(MaterialRagMetadata.MATERIAL_ID, String.valueOf(sourceId))
-                .build();
-        SearchRequest searchRequest = SearchRequest.builder()
-                .query(question)
-                .topK(topK)
-                .filterExpression(filter)
-                .build();
+        SearchRequest searchRequest = materialSearchRequest(sourceId, question, topK);
         return llmGateway.completeRagQuery(question, searchRequest);
+    }
+
+    public List<Document> searchMaterial(MaterialSourceType sourceType, Long sourceId, String question, int topK) {
+        ensureIndexed(sourceType, sourceId);
+        return vectorStore.similaritySearch(materialSearchRequest(sourceId, question, topK));
     }
 
     @Transactional
@@ -182,5 +226,16 @@ public class MaterialRagVectorService {
         } catch (Exception ex) {
             log.debug("No existing vectors to delete for material {}: {}", materialId, ex.getMessage());
         }
+    }
+
+    private SearchRequest materialSearchRequest(Long sourceId, String question, int topK) {
+        Filter.Expression filter = new FilterExpressionBuilder()
+                .eq(MaterialRagMetadata.MATERIAL_ID, String.valueOf(sourceId))
+                .build();
+        return SearchRequest.builder()
+                .query(question)
+                .topK(topK)
+                .filterExpression(filter)
+                .build();
     }
 }

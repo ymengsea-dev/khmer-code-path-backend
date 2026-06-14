@@ -60,7 +60,9 @@ public enum ExceptionCode {
             "Failed to index material for AI retrieval"),
     NOTE_NOT_FOUND(LmsStatusCode.NOT_FOUND, "Note not found"),
     QUIZ_NOT_FOUND(LmsStatusCode.NOT_FOUND, "Quiz not found"),
-    QUIZ_ALREADY_SUBMITTED(LmsStatusCode.OPERATION_NOT_ALLOWED, "You have already submitted this quiz");
+    QUIZ_ALREADY_SUBMITTED(LmsStatusCode.OPERATION_NOT_ALLOWED, "You have already submitted this quiz"),
+    QUIZ_HAS_SUBMISSIONS(LmsStatusCode.OPERATION_NOT_ALLOWED,
+            "This quiz already has student attempts. Duplicate it before editing.");
 
     private final LmsStatusCode statusCode;
     private final String message;

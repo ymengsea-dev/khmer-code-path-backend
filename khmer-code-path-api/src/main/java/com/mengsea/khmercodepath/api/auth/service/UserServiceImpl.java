@@ -7,8 +7,10 @@ import com.mengsea.khmercodepath.commons.constant.ExceptionCode;
 import com.mengsea.khmercodepath.commons.constant.Provider;
 import com.mengsea.khmercodepath.commons.constant.Role;
 import com.mengsea.khmercodepath.commons.domain.CustomUserDetail;
+import com.mengsea.khmercodepath.commons.domain.PasswordResetToken;
 import com.mengsea.khmercodepath.commons.domain.User;
 import com.mengsea.khmercodepath.commons.exception.BusinessException;
+import com.mengsea.khmercodepath.commons.repository.PasswordResetTokenRepository;
 import com.mengsea.khmercodepath.commons.repository.UserRepository;
 import com.mengsea.khmercodepath.commons.security.JwtService;
 import lombok.RequiredArgsConstructor;
@@ -18,11 +20,12 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.security.SecureRandom;
 import java.time.Instant;
-import java.util.Map;
+import java.util.Base64;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
@@ -34,13 +37,13 @@ public class UserServiceImpl implements UserService {
     private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
     private final UserMapper userMapper;
+    private final PasswordResetTokenRepository passwordResetTokenRepository;
+    private final PasswordResetMailer passwordResetMailer;
 
     /** Explicitly revoked refresh tokens (logout). Valid JWTs refresh even if not in {@link #refreshTokenStore}. */
     private final Set<String> revokedRefreshTokens = ConcurrentHashMap.newKeySet();
-    private final Map<String, String> refreshTokenStore = new ConcurrentHashMap<>();
-    private final Map<String, PasswordResetPayload> passwordResetStore = new ConcurrentHashMap<>();
-
-    private record PasswordResetPayload(String email, Instant expiresAt) {}
+    private final java.util.Map<String, String> refreshTokenStore = new ConcurrentHashMap<>();
+    private final SecureRandom secureRandom = new SecureRandom();
 
     @Override
     public void register(String username, String email, String password) {
@@ -140,27 +143,61 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public void requestPasswordReset(String email) {
-        userRepository.findByEmailAndDeletedFalse(email)
+    public UserResponse updateProfile(String email, String userName) {
+        User user = userRepository.findByEmailAndDeletedFalse(email)
                 .orElseThrow(() -> new BusinessException(ExceptionCode.USER_NOT_FOUND));
-        String token = UUID.randomUUID().toString();
-        passwordResetStore.put(token, new PasswordResetPayload(email, Instant.now().plusSeconds(3600)));
+        user.setUsername(userName.trim());
+        return userMapper.toResponse(userRepository.save(user));
     }
 
     @Override
+    public void changePassword(String email, String currentPassword, String newPassword) {
+        User user = userRepository.findByEmailAndDeletedFalse(email)
+                .orElseThrow(() -> new BusinessException(ExceptionCode.USER_NOT_FOUND));
+        if (user.getPassword() == null || !passwordEncoder.matches(currentPassword, user.getPassword())) {
+            throw new BusinessException(ExceptionCode.INVALID_CREDENTIAL);
+        }
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+    }
+
+    @Override
+    @Transactional
+    public void requestPasswordReset(String email) {
+        userRepository.findByEmailAndDeletedFalse(email)
+                .ifPresent(user -> {
+                    passwordResetTokenRepository.deleteByUser_UuidAndUsedAtIsNull(user.getUuid());
+                    PasswordResetToken reset = new PasswordResetToken();
+                    reset.setUser(user);
+                    reset.setToken(generateResetToken());
+                    reset.setExpiresAt(Instant.now().plusSeconds(3600));
+                    passwordResetTokenRepository.save(reset);
+                    passwordResetMailer.sendResetLink(user.getEmail(), reset.getToken());
+                });
+    }
+
+    @Override
+    @Transactional
     public void confirmPasswordReset(String token, String newPassword) {
-        PasswordResetPayload payload = passwordResetStore.get(token);
-        if (payload == null) {
+        PasswordResetToken reset = passwordResetTokenRepository.findByToken(token)
+                .orElseThrow(() -> new BusinessException(ExceptionCode.PASSWORD_RESET_TOKEN_INVALID));
+        if (reset.getUsedAt() != null) {
             throw new BusinessException(ExceptionCode.PASSWORD_RESET_TOKEN_INVALID);
         }
-        if (payload.expiresAt().isBefore(Instant.now())) {
-            passwordResetStore.remove(token);
+        if (reset.getExpiresAt().isBefore(Instant.now())) {
             throw new BusinessException(ExceptionCode.PASSWORD_RESET_TOKEN_EXPIRED);
         }
-        User user = userRepository.findByEmailAndDeletedFalse(payload.email())
+        User user = userRepository.findByEmailAndDeletedFalse(reset.getUser().getEmail())
                 .orElseThrow(() -> new BusinessException(ExceptionCode.USER_NOT_FOUND));
         user.setPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);
-        passwordResetStore.remove(token);
+        reset.setUsedAt(Instant.now());
+        passwordResetTokenRepository.save(reset);
+    }
+
+    private String generateResetToken() {
+        byte[] bytes = new byte[32];
+        secureRandom.nextBytes(bytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 }

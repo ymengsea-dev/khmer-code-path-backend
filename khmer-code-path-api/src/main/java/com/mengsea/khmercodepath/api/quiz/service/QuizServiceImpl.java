@@ -6,7 +6,11 @@ import com.mengsea.khmercodepath.api.quiz.payload.PublishQuizRequest;
 import com.mengsea.khmercodepath.api.quiz.payload.QuizAttemptResultDto;
 import com.mengsea.khmercodepath.api.quiz.payload.QuizDto;
 import com.mengsea.khmercodepath.api.quiz.payload.QuizQuestionDto;
+import com.mengsea.khmercodepath.api.quiz.payload.QuizResultsDto;
+import com.mengsea.khmercodepath.api.quiz.payload.QuizSubmissionReviewDto;
+import com.mengsea.khmercodepath.api.quiz.payload.QuizWrongAnswerDto;
 import com.mengsea.khmercodepath.api.quiz.payload.SubmitAnswersRequest;
+import com.mengsea.khmercodepath.api.quiz.payload.UpdateQuizRequest;
 import com.mengsea.khmercodepath.commons.constant.ExceptionCode;
 import com.mengsea.khmercodepath.commons.domain.LmsClass;
 import com.mengsea.khmercodepath.commons.domain.Quiz;
@@ -14,6 +18,7 @@ import com.mengsea.khmercodepath.commons.domain.QuizQuestion;
 import com.mengsea.khmercodepath.commons.domain.QuizSubmission;
 import com.mengsea.khmercodepath.commons.domain.User;
 import com.mengsea.khmercodepath.commons.exception.BusinessException;
+import com.mengsea.khmercodepath.commons.repository.ClassEnrollmentRepository;
 import com.mengsea.khmercodepath.commons.repository.LmsClassRepository;
 import com.mengsea.khmercodepath.commons.repository.QuizQuestionRepository;
 import com.mengsea.khmercodepath.commons.repository.QuizRepository;
@@ -26,6 +31,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -39,6 +45,7 @@ public class QuizServiceImpl implements QuizService {
     private final QuizSubmissionRepository quizSubmissionRepository;
     private final LmsClassRepository lmsClassRepository;
     private final UserRepository userRepository;
+    private final ClassEnrollmentRepository classEnrollmentRepository;
     private final ObjectMapper objectMapper;
 
     // ── Publish ──────────────────────────────────────────────────────────────
@@ -81,7 +88,7 @@ public class QuizServiceImpl implements QuizService {
         List<Quiz> quizzes = (classId != null && classId > 0)
                 ? quizRepository.findByClassAndTeacher(classId, teacherUuid)
                 : quizRepository.findAllByTeacherUuid(teacherUuid);
-        return quizzes.stream().map(q -> toDto(q, List.of(), null)).toList();
+        return quizzes.stream().map(q -> toDtoWithTeacherCounts(q, null)).toList();
     }
 
     @Override
@@ -208,6 +215,93 @@ public class QuizServiceImpl implements QuizService {
                 );
     }
 
+    // ── Results ───────────────────────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public QuizResultsDto getResults(Long quizId) {
+        String teacherUuid = SecurityUtils.requireCurrentUser().getUuid();
+
+        Quiz quiz = quizRepository.findByIdAndDeletedFalse(quizId)
+                .orElseThrow(() -> new BusinessException(ExceptionCode.QUIZ_NOT_FOUND));
+
+        if (!quiz.getLmsClass().getTeacher().getUuid().equals(teacherUuid)) {
+            throw new BusinessException(ExceptionCode.ACCESS_DENIED);
+        }
+
+        List<QuizQuestion> questions = quizQuestionRepository.findByQuiz_IdOrderByOrderIndex(quizId);
+        List<QuizSubmission> submissions = quizSubmissionRepository.findByQuizIdWithStudent(quizId);
+        int totalQuestions = questions.isEmpty() ? quiz.getQuestionCount() : questions.size();
+
+        List<QuizSubmissionReviewDto> rows = submissions.stream()
+                .map(sub -> toReviewDto(sub, totalQuestions, questions))
+                .toList();
+
+        List<Integer> submittedScores = submissions.stream()
+                .filter(sub -> isSubmittedStatus(sub.getStatus()))
+                .map(QuizSubmission::getScore)
+                .filter(score -> score != null)
+                .toList();
+
+        long enrolled = classEnrollmentRepository.countByLmsClass_Id(quiz.getLmsClass().getId());
+        long failed = submissions.stream().filter(sub -> "FAILED".equals(sub.getStatus())).count();
+        double averagePercent = submittedScores.isEmpty() || totalQuestions == 0
+                ? 0.0
+                : submittedScores.stream().mapToInt(Integer::intValue).average().orElse(0.0) * 100.0 / totalQuestions;
+
+        QuizDto quizDto = toDto(quiz, List.of(), null);
+
+        return QuizResultsDto.builder()
+                .quiz(quizDto.toBuilder()
+                        .enrolledStudents(enrolled)
+                        .submittedCount((long) submittedScores.size())
+                        .failedCount(failed)
+                        .build())
+                .enrolledStudents(enrolled)
+                .submittedCount(submittedScores.size())
+                .failedCount(failed)
+                .notStartedCount(Math.max(0, enrolled - submissions.size()))
+                .averageScorePercent(round1(averagePercent))
+                .highestScore(submittedScores.stream().mapToInt(Integer::intValue).max().orElse(0))
+                .lowestScore(submittedScores.stream().mapToInt(Integer::intValue).min().orElse(0))
+                .submissions(rows)
+                .build();
+    }
+
+    // ── Update ────────────────────────────────────────────────────────────────
+
+    @Override
+    @Transactional
+    public QuizDto updateQuiz(Long quizId, UpdateQuizRequest request) {
+        String teacherUuid = SecurityUtils.requireCurrentUser().getUuid();
+
+        Quiz quiz = quizRepository.findByIdAndDeletedFalse(quizId)
+                .orElseThrow(() -> new BusinessException(ExceptionCode.QUIZ_NOT_FOUND));
+
+        if (!quiz.getLmsClass().getTeacher().getUuid().equals(teacherUuid)) {
+            throw new BusinessException(ExceptionCode.ACCESS_DENIED);
+        }
+
+        if (quizSubmissionRepository.countByQuiz_Id(quizId) > 0) {
+            throw new BusinessException(ExceptionCode.QUIZ_HAS_SUBMISSIONS);
+        }
+
+        quiz.setTitle(request.getTitle().trim());
+        quiz.setDescription(request.getDescription());
+        quiz.setGeneratedContent(request.getGeneratedContent());
+        quiz.setQuestionCount(request.getQuestionCount());
+        quiz.setDurationMinutes(request.getDurationMinutes());
+        quiz = quizRepository.save(quiz);
+
+        quizQuestionRepository.deleteByQuiz_Id(quizId);
+        List<QuizQuestion> questions = parseAndSaveQuestions(quiz, request.getGeneratedContent());
+
+        return toDtoWithTeacherCounts(quiz, null).toBuilder()
+                .questions(questions.stream().map(q -> toQuestionDto(q, true)).toList())
+                .generatedContent(quiz.getGeneratedContent())
+                .build();
+    }
+
     // ── Delete ────────────────────────────────────────────────────────────────
 
     @Override
@@ -278,6 +372,17 @@ public class QuizServiceImpl implements QuizService {
                 .build();
     }
 
+    private QuizDto toDtoWithTeacherCounts(Quiz quiz, String submissionStatus) {
+        long enrolled = classEnrollmentRepository.countByLmsClass_Id(quiz.getLmsClass().getId());
+        long submitted = quizSubmissionRepository.countSubmittedByQuizId(quiz.getId());
+        long failed = quizSubmissionRepository.countByQuiz_IdAndStatus(quiz.getId(), "FAILED");
+        return toDto(quiz, List.of(), submissionStatus).toBuilder()
+                .enrolledStudents(enrolled)
+                .submittedCount(submitted)
+                .failedCount(failed)
+                .build();
+    }
+
     private QuizQuestionDto toQuestionDto(QuizQuestion q, boolean includeAnswer) {
         List<String> options;
         try {
@@ -292,5 +397,95 @@ public class QuizServiceImpl implements QuizService {
                 .correctIndex(includeAnswer ? q.getCorrectIndex() : null)
                 .explanation(includeAnswer ? q.getExplanation() : null)
                 .build();
+    }
+
+    private QuizSubmissionReviewDto toReviewDto(
+            QuizSubmission submission,
+            int totalQuestions,
+            List<QuizQuestion> questions
+    ) {
+        Integer score = submission.getScore();
+        Double scorePercent = score == null || totalQuestions == 0
+                ? null
+                : round1(score * 100.0 / totalQuestions);
+        Map<Long, Integer> answers = parseAnswers(submission.getAnswersJson());
+        return QuizSubmissionReviewDto.builder()
+                .submissionId(submission.getId())
+                .studentId(submission.getStudent().getUuid())
+                .studentName(submission.getStudent().getUsername())
+                .studentEmail(submission.getStudent().getEmail())
+                .status(submission.getStatus())
+                .score(score)
+                .totalQuestions(totalQuestions)
+                .scorePercent(scorePercent)
+                .failReason(submission.getFailReason())
+                .answers(answers)
+                .wrongAnswers(buildWrongAnswers(questions, answers))
+                .submittedAt(submission.getSubmittedAt())
+                .build();
+    }
+
+    private List<QuizWrongAnswerDto> buildWrongAnswers(
+            List<QuizQuestion> questions,
+            Map<Long, Integer> answers
+    ) {
+        if (questions.isEmpty()) {
+            return List.of();
+        }
+        List<QuizWrongAnswerDto> wrong = new ArrayList<>();
+        for (QuizQuestion question : questions) {
+            Integer selected = answers.get(question.getId());
+            if (selected != null && selected == question.getCorrectIndex()) {
+                continue;
+            }
+            List<String> options = parseOptions(question.getOptionsJson());
+            wrong.add(QuizWrongAnswerDto.builder()
+                    .questionId(question.getId())
+                    .question(question.getQuestionText())
+                    .selectedIndex(selected)
+                    .selectedAnswer(optionAt(options, selected))
+                    .correctIndex(question.getCorrectIndex())
+                    .correctAnswer(optionAt(options, question.getCorrectIndex()))
+                    .explanation(question.getExplanation())
+                    .build());
+        }
+        return wrong;
+    }
+
+    private List<String> parseOptions(String optionsJson) {
+        if (optionsJson == null || optionsJson.isBlank()) {
+            return Collections.emptyList();
+        }
+        try {
+            return objectMapper.readValue(optionsJson, new TypeReference<>() {});
+        } catch (Exception e) {
+            return Collections.emptyList();
+        }
+    }
+
+    private static String optionAt(List<String> options, Integer index) {
+        if (index == null || index < 0 || index >= options.size()) {
+            return null;
+        }
+        return options.get(index);
+    }
+
+    private Map<Long, Integer> parseAnswers(String answersJson) {
+        if (answersJson == null || answersJson.isBlank()) {
+            return Map.of();
+        }
+        try {
+            return objectMapper.readValue(answersJson, new TypeReference<>() {});
+        } catch (Exception e) {
+            return Map.of();
+        }
+    }
+
+    private static double round1(double value) {
+        return Math.round(value * 10.0) / 10.0;
+    }
+
+    private static boolean isSubmittedStatus(String status) {
+        return "SUBMITTED".equals(status) || "COMPLETED".equals(status);
     }
 }
