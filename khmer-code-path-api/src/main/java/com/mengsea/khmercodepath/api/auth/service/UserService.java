@@ -14,7 +14,7 @@ public interface UserService {
 
     UserResponse me(String email);
 
-    UserResponse updateProfile(String email, String userName);
+    UserResponse updateProfile(String email, String userName, String bio);
 
     void changePassword(String email, String currentPassword, String newPassword);
 

@@ -8,10 +8,12 @@ import com.mengsea.khmercodepath.api.quiz.payload.QuizDto;
 import com.mengsea.khmercodepath.api.quiz.payload.QuizQuestionDto;
 import com.mengsea.khmercodepath.api.quiz.payload.QuizResultsDto;
 import com.mengsea.khmercodepath.api.quiz.payload.QuizSubmissionReviewDto;
+import com.mengsea.khmercodepath.api.quiz.payload.QuizSummaryDto;
 import com.mengsea.khmercodepath.api.quiz.payload.QuizWrongAnswerDto;
 import com.mengsea.khmercodepath.api.quiz.payload.SubmitAnswersRequest;
 import com.mengsea.khmercodepath.api.quiz.payload.UpdateQuizRequest;
 import com.mengsea.khmercodepath.commons.constant.ExceptionCode;
+import com.mengsea.khmercodepath.commons.constant.LmsAuthority;
 import com.mengsea.khmercodepath.commons.domain.LmsClass;
 import com.mengsea.khmercodepath.commons.domain.Quiz;
 import com.mengsea.khmercodepath.commons.domain.QuizQuestion;
@@ -25,6 +27,8 @@ import com.mengsea.khmercodepath.commons.repository.QuizRepository;
 import com.mengsea.khmercodepath.commons.repository.QuizSubmissionRepository;
 import com.mengsea.khmercodepath.commons.repository.UserRepository;
 import com.mengsea.khmercodepath.commons.security.SecurityUtils;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -300,6 +304,48 @@ public class QuizServiceImpl implements QuizService {
                 .questions(questions.stream().map(q -> toQuestionDto(q, true)).toList())
                 .generatedContent(quiz.getGeneratedContent())
                 .build();
+    }
+
+    // ── Summary ───────────────────────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public QuizSummaryDto getSummary() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        boolean isTeacher = auth.getAuthorities().stream()
+                .anyMatch(a -> LmsAuthority.LSN_MANAGE.equals(a.getAuthority()));
+
+        String userUuid = SecurityUtils.requireCurrentUser().getUuid();
+
+        if (isTeacher) {
+            long total = quizRepository.countByTeacherUuid(userUuid);
+            long totalSubmissions = quizSubmissionRepository.countSubmittedByTeacherUuid(userUuid);
+            long totalFailed = quizSubmissionRepository.countFailedByTeacherUuid(userUuid);
+            long totalQuestions = quizRepository.sumQuestionCountByTeacherUuid(userUuid);
+            return QuizSummaryDto.builder()
+                    .total(total)
+                    .pending(0)
+                    .completed(0)
+                    .missed(0)
+                    .totalSubmissions(totalSubmissions)
+                    .totalFailed(totalFailed)
+                    .totalQuestions(totalQuestions)
+                    .build();
+        } else {
+            long total = quizRepository.countPublishedForStudent(userUuid);
+            long completed = quizSubmissionRepository.countByStudent_UuidAndStatus(userUuid, "SUBMITTED");
+            long missed = quizSubmissionRepository.countByStudent_UuidAndStatus(userUuid, "FAILED");
+            long pending = Math.max(0L, total - completed - missed);
+            return QuizSummaryDto.builder()
+                    .total(total)
+                    .pending(pending)
+                    .completed(completed)
+                    .missed(missed)
+                    .totalSubmissions(0)
+                    .totalFailed(0)
+                    .totalQuestions(0)
+                    .build();
+        }
     }
 
     // ── Delete ────────────────────────────────────────────────────────────────

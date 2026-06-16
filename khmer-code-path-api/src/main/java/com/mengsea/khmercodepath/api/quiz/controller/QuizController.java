@@ -4,6 +4,7 @@ import com.mengsea.khmercodepath.api.quiz.payload.PublishQuizRequest;
 import com.mengsea.khmercodepath.api.quiz.payload.QuizAttemptResultDto;
 import com.mengsea.khmercodepath.api.quiz.payload.QuizDto;
 import com.mengsea.khmercodepath.api.quiz.payload.QuizResultsDto;
+import com.mengsea.khmercodepath.api.quiz.payload.QuizSummaryDto;
 import com.mengsea.khmercodepath.api.quiz.payload.SubmitAnswersRequest;
 import com.mengsea.khmercodepath.api.quiz.payload.UpdateQuizRequest;
 import com.mengsea.khmercodepath.api.quiz.service.QuizService;
@@ -114,6 +115,14 @@ public class QuizController {
     public ResponseEntity<ApiResponse<Void>> deleteQuiz(@PathVariable Long id) {
         quizService.deleteQuiz(id);
         return ResponseEntity.ok(ApiResponses.of("QUIZ-0606", LmsStatusCode.SUCCESS, null, null));
+    }
+
+    @Operation(summary = "QUIZ-0609 · Aggregated quiz stats for the current user (role-aware)")
+    @GetMapping("/summary")
+    @PreAuthorize("hasAnyAuthority('" + LmsAuthority.LSN_MANAGE + "', '" + LmsAuthority.CLS_READ + "')")
+    public ResponseEntity<ApiResponse<QuizSummaryDto>> getSummary() {
+        QuizSummaryDto data = quizService.getSummary();
+        return ResponseEntity.ok(ApiResponses.of("QUIZ-0609", LmsStatusCode.SUCCESS, null, data));
     }
 
     @Operation(summary = "QUIZ-0605 · Student marks quiz as failed (tab-switch / cheating detection)")

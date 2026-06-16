@@ -53,6 +53,9 @@ public class User {
     @Column(name = "teacher_id", unique = true)
     private String teacherId;
 
+    @Column(length = 500)
+    private String bio;
+
     @Column(nullable = false)
     private boolean deleted = false;
 

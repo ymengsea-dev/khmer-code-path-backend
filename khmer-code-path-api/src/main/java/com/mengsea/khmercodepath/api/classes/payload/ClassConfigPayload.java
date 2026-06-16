@@ -13,4 +13,5 @@ public class ClassConfigPayload {
     private List<LessonTabPayload> lessonTabs;
     private List<String> cardGradients;
     private ClassCreateDefaultsPayload createDefaults;
+    private GradingWeightsPayload gradingWeights;
 }

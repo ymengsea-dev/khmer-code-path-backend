@@ -48,4 +48,31 @@ public interface QuizSubmissionRepository extends JpaRepository<QuizSubmission, 
             ORDER BY s.submittedAt DESC
             """)
     List<QuizSubmission> findByQuizIdWithStudent(@Param("quizId") Long quizId);
+
+    /** Student: count submissions by status (e.g. SUBMITTED or FAILED). */
+    long countByStudent_UuidAndStatus(String studentUuid, String status);
+
+    /** Teacher: total SUBMITTED/COMPLETED submissions across all quizzes they own. */
+    @Query("""
+            SELECT COUNT(s) FROM QuizSubmission s
+            JOIN s.quiz q
+            JOIN q.lmsClass c
+            WHERE q.deleted = false
+            AND c.deleted = false
+            AND c.teacher.uuid = :teacherUuid
+            AND s.status IN ('SUBMITTED', 'COMPLETED')
+            """)
+    long countSubmittedByTeacherUuid(@Param("teacherUuid") String teacherUuid);
+
+    /** Teacher: total FAILED submissions across all quizzes they own. */
+    @Query("""
+            SELECT COUNT(s) FROM QuizSubmission s
+            JOIN s.quiz q
+            JOIN q.lmsClass c
+            WHERE q.deleted = false
+            AND c.deleted = false
+            AND c.teacher.uuid = :teacherUuid
+            AND s.status = 'FAILED'
+            """)
+    long countFailedByTeacherUuid(@Param("teacherUuid") String teacherUuid);
 }

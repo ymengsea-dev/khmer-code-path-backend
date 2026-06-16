@@ -12,4 +12,7 @@ public class UpdateProfileRequest {
     @NotBlank
     @Size(max = 120)
     private String userName;
+
+    @Size(max = 500)
+    private String bio;
 }

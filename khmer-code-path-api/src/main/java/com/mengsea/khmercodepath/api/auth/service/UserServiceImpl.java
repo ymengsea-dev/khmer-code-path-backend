@@ -143,10 +143,11 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public UserResponse updateProfile(String email, String userName) {
+    public UserResponse updateProfile(String email, String userName, String bio) {
         User user = userRepository.findByEmailAndDeletedFalse(email)
                 .orElseThrow(() -> new BusinessException(ExceptionCode.USER_NOT_FOUND));
         user.setUsername(userName.trim());
+        user.setBio(bio != null && !bio.isBlank() ? bio.trim() : null);
         return userMapper.toResponse(userRepository.save(user));
     }
 

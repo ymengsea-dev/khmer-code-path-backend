@@ -4,6 +4,7 @@ import com.mengsea.khmercodepath.api.quiz.payload.PublishQuizRequest;
 import com.mengsea.khmercodepath.api.quiz.payload.QuizAttemptResultDto;
 import com.mengsea.khmercodepath.api.quiz.payload.QuizDto;
 import com.mengsea.khmercodepath.api.quiz.payload.QuizResultsDto;
+import com.mengsea.khmercodepath.api.quiz.payload.QuizSummaryDto;
 import com.mengsea.khmercodepath.api.quiz.payload.SubmitAnswersRequest;
 import com.mengsea.khmercodepath.api.quiz.payload.UpdateQuizRequest;
 
@@ -37,4 +38,7 @@ public interface QuizService {
 
     /** Teacher edits a quiz before any student attempts exist. */
     QuizDto updateQuiz(Long quizId, UpdateQuizRequest request);
+
+    /** Aggregated quiz stats for the current user (role-aware: student vs teacher). */
+    QuizSummaryDto getSummary();
 }

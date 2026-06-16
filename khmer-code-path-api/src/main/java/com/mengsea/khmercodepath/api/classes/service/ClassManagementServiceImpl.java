@@ -4,6 +4,7 @@ import com.mengsea.khmercodepath.api.classes.config.ClassesProperties;
 import com.mengsea.khmercodepath.api.classes.payload.AssignStudentsRequest;
 import com.mengsea.khmercodepath.api.classes.payload.ClassConfigPayload;
 import com.mengsea.khmercodepath.api.classes.payload.ClassCreateDefaultsPayload;
+import com.mengsea.khmercodepath.api.classes.payload.GradingWeightsPayload;
 import com.mengsea.khmercodepath.api.classes.payload.ClassDetailPayload;
 import com.mengsea.khmercodepath.api.classes.payload.ClassPagePayload;
 import com.mengsea.khmercodepath.api.classes.payload.ClassSummaryPayload;
@@ -69,6 +70,7 @@ public class ClassManagementServiceImpl implements ClassManagementService {
                 .map(t -> LessonTabPayload.builder().id(t.getId()).label(t.getLabel()).build())
                 .toList();
         ClassesProperties.CreateDefaults defs = classesProperties.getCreateDefaults();
+        ClassesProperties.GradingWeights gw = classesProperties.getGradingWeights();
         return ClassConfigPayload.builder()
                 .allSemestersLabel(classesProperties.getAllSemestersLabel())
                 .semesterFilters(semesterFilters)
@@ -77,6 +79,13 @@ public class ClassManagementServiceImpl implements ClassManagementService {
                 .createDefaults(ClassCreateDefaultsPayload.builder()
                         .semester(defs.getSemester())
                         .academicYear(defs.getAcademicYear())
+                        .build())
+                .gradingWeights(GradingWeightsPayload.builder()
+                        .attendance(gw.getAttendance())
+                        .assignment(gw.getAssignment())
+                        .quiz(gw.getQuiz())
+                        .midterm(gw.getMidterm())
+                        .finalExam(gw.getFinalExam())
                         .build())
                 .build();
     }

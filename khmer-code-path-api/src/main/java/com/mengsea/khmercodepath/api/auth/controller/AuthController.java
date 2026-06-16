@@ -102,7 +102,7 @@ public class AuthController {
             Authentication authentication,
             @Valid @RequestBody UpdateProfileRequest request
     ) {
-        UserResponse me = userService.updateProfile(authentication.getName(), request.getUserName());
+        UserResponse me = userService.updateProfile(authentication.getName(), request.getUserName(), request.getBio());
         ApiResponse<UserResponse> body = ApiResponses.of("AUTH-0131", LmsStatusCode.SUCCESS, null, me);
         return ResponseEntity.ok(body);
     }

@@ -58,4 +58,28 @@ public interface QuizRepository extends JpaRepository<Quiz, Long> {
     List<Quiz> findPublishedForStudent(@Param("studentUuid") String studentUuid);
 
     Optional<Quiz> findByIdAndDeletedFalse(Long id);
+
+    /** Student: count PUBLISHED quizzes assigned to enrolled classes. */
+    @Query("""
+            SELECT COUNT(DISTINCT q) FROM Quiz q
+            JOIN q.lmsClass c
+            WHERE q.deleted = false
+            AND c.deleted = false
+            AND q.status = 'PUBLISHED'
+            AND EXISTS (
+                SELECT e FROM ClassEnrollment e
+                WHERE e.lmsClass.id = c.id
+                AND e.student.uuid = :studentUuid
+            )
+            """)
+    long countPublishedForStudent(@Param("studentUuid") String studentUuid);
+
+    /** Teacher: sum of questionCount across all their non-deleted quizzes. */
+    @Query("""
+            SELECT COALESCE(SUM(q.questionCount), 0) FROM Quiz q
+            WHERE q.deleted = false
+            AND q.lmsClass.deleted = false
+            AND q.lmsClass.teacher.uuid = :teacherUuid
+            """)
+    long sumQuestionCountByTeacherUuid(@Param("teacherUuid") String teacherUuid);
 }

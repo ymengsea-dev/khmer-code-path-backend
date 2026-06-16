@@ -14,6 +14,7 @@ public class UserMapper {
                 .email(user.getEmail())
                 .role(user.getRole())
                 .isActive(user.isActive())
+                .bio(user.getBio())
                 .build();
     }
 }
