@@ -15,6 +15,14 @@ public class UserMapper {
                 .role(user.getRole())
                 .isActive(user.isActive())
                 .bio(user.getBio())
+                .avatarUrl(resolveAvatarUrl(user))
                 .build();
+    }
+
+    private static String resolveAvatarUrl(User user) {
+        if (user.getAvatarStorageKey() == null || user.getAvatarStorageKey().isBlank()) {
+            return null;
+        }
+        return "/api/v1/profile/avatar/" + user.getUuid();
     }
 }

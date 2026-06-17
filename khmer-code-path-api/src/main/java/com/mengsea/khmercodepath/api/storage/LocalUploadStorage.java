@@ -59,6 +59,24 @@ public class LocalUploadStorage implements UploadStorage {
     }
 
     @Override
+    public StoredFile storeAvatar(String userId, MultipartFile file) {
+        AvatarUploadValidator.validateFile(file);
+        String safeName = AvatarUploadValidator.sanitizeFileName(file.getOriginalFilename());
+        String key = "avatars/" + userId + "/" + UUID.randomUUID() + "_" + safeName;
+        Path target = root.resolve(key).normalize();
+        if (!target.startsWith(root)) {
+            throw new BusinessException(ExceptionCode.VALIDATION_ERROR);
+        }
+        try {
+            Files.createDirectories(target.getParent());
+            Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException ex) {
+            throw new BusinessException(ExceptionCode.FILE_STORAGE_FAILED);
+        }
+        return new StoredFile(key, safeName, file.getContentType(), file.getSize());
+    }
+
+    @Override
     public Resource loadAsResource(String storageKey) {
         try {
             Path file = root.resolve(storageKey).normalize();

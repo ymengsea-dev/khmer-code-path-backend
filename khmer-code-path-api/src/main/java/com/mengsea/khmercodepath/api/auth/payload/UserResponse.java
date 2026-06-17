@@ -17,4 +17,5 @@ public class UserResponse {
     private Role role;
     private boolean isActive;
     private String bio;
+    private String avatarUrl;
 }

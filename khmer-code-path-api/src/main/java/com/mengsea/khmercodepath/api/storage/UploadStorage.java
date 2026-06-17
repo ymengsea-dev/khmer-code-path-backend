@@ -14,6 +14,8 @@ public interface UploadStorage {
 
     StoredFile store(String category, Long ownerId, MultipartFile file);
 
+    StoredFile storeAvatar(String userId, MultipartFile file);
+
     Resource loadAsResource(String storageKey);
 
     InputStream openStream(String storageKey);

@@ -65,7 +65,8 @@ public class SecurityConfig {
                                 "/swagger-ui.html",
                                 "/v3/api-docs/**",
                                 "/v3/api-docs",
-                                "/api/v1/files/**"
+                                "/api/v1/files/**",
+                                "/api/v1/profile/avatar/*"
                         ).permitAll()
                         .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()

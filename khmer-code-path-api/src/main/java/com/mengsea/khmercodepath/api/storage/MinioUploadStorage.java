@@ -64,6 +64,32 @@ public class MinioUploadStorage implements UploadStorage {
         return new StoredFile(key, safeName, file.getContentType(), size >= 0 ? size : file.getSize());
     }
 
+    @Override
+    public StoredFile storeAvatar(String userId, MultipartFile file) {
+        AvatarUploadValidator.validateFile(file);
+        ensureBucketExists();
+        String safeName = AvatarUploadValidator.sanitizeFileName(file.getOriginalFilename());
+        String key = "avatars/" + userId + "/" + UUID.randomUUID() + "_" + safeName;
+        long size = resolveObjectSize(file);
+        try (InputStream in = file.getInputStream()) {
+            minioClient.putObject(
+                    PutObjectArgs.builder()
+                            .bucket(minioProperties.getBucketName())
+                            .object(key)
+                            .stream(in, size, size < 0 ? MIN_PART_SIZE_BYTES : -1)
+                            .contentType(file.getContentType())
+                            .build()
+            );
+        } catch (BusinessException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            log.error("MinIO avatar upload failed for object {} in bucket {}", key,
+                    minioProperties.getBucketName(), ex);
+            throw new BusinessException(ExceptionCode.FILE_STORAGE_FAILED);
+        }
+        return new StoredFile(key, safeName, file.getContentType(), size >= 0 ? size : file.getSize());
+    }
+
     private void ensureBucketExists() {
         String bucket = minioProperties.getBucketName();
         try {

@@ -108,6 +108,10 @@ public class ApiRequestLoggingFilter extends OncePerRequestFilter {
         if (path.endsWith("/stream")) {
             return false;
         }
+        // Binary downloads (avatars, lesson materials) exceed the response cache limit and break if wrapped.
+        if (path.contains("/profile/avatar/") || path.endsWith("/download")) {
+            return false;
+        }
         return !path.startsWith("/swagger-ui")
                 && !path.startsWith("/v3/api-docs")
                 && !path.startsWith("/swagger-ui.html")

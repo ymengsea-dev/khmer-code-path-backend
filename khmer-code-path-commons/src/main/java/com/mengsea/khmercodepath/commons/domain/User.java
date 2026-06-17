@@ -56,6 +56,9 @@ public class User {
     @Column(length = 500)
     private String bio;
 
+    @Column(name = "avatar_storage_key", length = 512)
+    private String avatarStorageKey;
+
     @Column(nullable = false)
     private boolean deleted = false;
 
