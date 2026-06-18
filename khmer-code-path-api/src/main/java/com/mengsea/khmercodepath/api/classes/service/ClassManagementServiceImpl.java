@@ -7,6 +7,9 @@ import com.mengsea.khmercodepath.api.classes.payload.ClassCreateDefaultsPayload;
 import com.mengsea.khmercodepath.api.classes.payload.GradingWeightsPayload;
 import com.mengsea.khmercodepath.api.classes.payload.ClassDetailPayload;
 import com.mengsea.khmercodepath.api.classes.payload.ClassPagePayload;
+import com.mengsea.khmercodepath.api.classes.payload.ClassSettingsConfigPayload;
+import com.mengsea.khmercodepath.api.classes.payload.ClassStatusOptionPayload;
+import com.mengsea.khmercodepath.api.classes.payload.ScoreComponentPayload;
 import com.mengsea.khmercodepath.api.classes.payload.ClassSummaryPayload;
 import com.mengsea.khmercodepath.api.classes.payload.CreateClassRequest;
 import com.mengsea.khmercodepath.api.classes.payload.LessonTabPayload;
@@ -18,17 +21,21 @@ import com.mengsea.khmercodepath.api.classes.payload.UpdateClassRequest;
 import com.mengsea.khmercodepath.api.users.mapper.UserAdminMapper;
 import com.mengsea.khmercodepath.api.users.payload.UserDetailPayload;
 import com.mengsea.khmercodepath.commons.constant.ClassStatus;
+import com.mengsea.khmercodepath.commons.constant.InvitationStatus;
 import com.mengsea.khmercodepath.commons.constant.ExceptionCode;
 import com.mengsea.khmercodepath.commons.constant.Role;
 import com.mengsea.khmercodepath.commons.domain.ClassEnrollment;
+import com.mengsea.khmercodepath.commons.domain.ClassInvitation;
 import com.mengsea.khmercodepath.commons.domain.LmsClass;
 import com.mengsea.khmercodepath.commons.domain.User;
 import com.mengsea.khmercodepath.commons.exception.BusinessException;
 import com.mengsea.khmercodepath.commons.repository.ClassEnrollmentRepository;
+import com.mengsea.khmercodepath.commons.repository.ClassInvitationRepository;
 import com.mengsea.khmercodepath.commons.repository.LessonRepository;
 import com.mengsea.khmercodepath.commons.repository.LmsClassRepository;
 import com.mengsea.khmercodepath.commons.repository.LmsClassSpecifications;
 import com.mengsea.khmercodepath.commons.repository.UserRepository;
+import com.mengsea.khmercodepath.commons.repository.UserSpecifications;
 import com.mengsea.khmercodepath.commons.security.ClassAccessHelper;
 import com.mengsea.khmercodepath.commons.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
@@ -38,6 +45,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashSet;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -54,6 +62,7 @@ public class ClassManagementServiceImpl implements ClassManagementService {
 
     private final LmsClassRepository lmsClassRepository;
     private final ClassEnrollmentRepository classEnrollmentRepository;
+    private final ClassInvitationRepository classInvitationRepository;
     private final LessonRepository lessonRepository;
     private final UserRepository userRepository;
     private final UserAdminMapper userAdminMapper;
@@ -87,6 +96,28 @@ public class ClassManagementServiceImpl implements ClassManagementService {
                         .midterm(gw.getMidterm())
                         .finalExam(gw.getFinalExam())
                         .build())
+                .scoreComponents(buildScoreComponents())
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ClassSettingsConfigPayload getClassSettingsConfig(Long id) {
+        LmsClass entity = lmsClassRepository.findByIdAndDeletedFalse(id)
+                .orElseThrow(() -> new BusinessException(ExceptionCode.CLASS_NOT_FOUND));
+        classAccessHelper.assertCanManageClass(entity);
+        return ClassSettingsConfigPayload.builder()
+                .classId(entity.getId())
+                .className(entity.getName())
+                .tabs(classesProperties.getSettingsTabs().stream()
+                        .map(t -> LessonTabPayload.builder().id(t.getId()).label(t.getLabel()).build())
+                        .toList())
+                .scoreComponents(buildScoreComponents())
+                .statusOptions(List.of(
+                        ClassStatusOptionPayload.builder().value(ClassStatus.ACTIVE).label("Active").build(),
+                        ClassStatusOptionPayload.builder().value(ClassStatus.DRAFT).label("Draft").build(),
+                        ClassStatusOptionPayload.builder().value(ClassStatus.ARCHIVED).label("Archived").build()
+                ))
                 .build();
     }
 
@@ -164,6 +195,7 @@ public class ClassManagementServiceImpl implements ClassManagementService {
         entity.setRoomNumber(blankToNull(request.getRoomNumber()));
         entity.setStatus(request.getStatus() != null ? request.getStatus() : ClassStatus.ACTIVE);
         entity.setDeleted(false);
+        applyDefaultGradingWeights(entity);
         lmsClassRepository.save(entity);
         return toDetail(reloadWithTeacher(entity.getId()));
     }
@@ -210,6 +242,9 @@ public class ClassManagementServiceImpl implements ClassManagementService {
         }
         if (request.getStatus() != null) {
             entity.setStatus(request.getStatus());
+        }
+        if (request.getGradingWeights() != null) {
+            applyGradingWeights(entity, request.getGradingWeights());
         }
 
         lmsClassRepository.save(entity);
@@ -261,6 +296,37 @@ public class ClassManagementServiceImpl implements ClassManagementService {
         assertCanRead(entity);
         return classEnrollmentRepository.findByLmsClass_IdOrderByEnrolledAtAsc(id).stream()
                 .map(ClassEnrollment::getStudent)
+                .map(userAdminMapper::toDetail)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<UserDetailPayload> listInviteCandidates(Long id) {
+        LmsClass entity = lmsClassRepository.findByIdAndDeletedFalse(id)
+                .orElseThrow(() -> new BusinessException(ExceptionCode.CLASS_NOT_FOUND));
+        classAccessHelper.assertCanManageClass(entity);
+
+        Set<String> excluded = new HashSet<>();
+        for (ClassEnrollment enrollment : classEnrollmentRepository.findByLmsClass_IdOrderByEnrolledAtAsc(id)) {
+            if (enrollment.getStudent() != null) {
+                excluded.add(enrollment.getStudent().getUuid());
+            }
+        }
+        for (ClassInvitation invitation : classInvitationRepository.findByLmsClass_IdAndStatusOrderByCreatedAtDesc(
+                id, InvitationStatus.PENDING)) {
+            if (invitation.getStudent() != null) {
+                excluded.add(invitation.getStudent().getUuid());
+            }
+        }
+
+        Specification<User> spec = Specification.where(UserSpecifications.deletedFlag(false))
+                .and(UserSpecifications.roleEquals(Role.STUDENT))
+                .and(UserSpecifications.activeEquals(true));
+
+        return userRepository.findAll(spec).stream()
+                .filter(user -> !excluded.contains(user.getUuid()))
+                .sorted(Comparator.comparing(User::getUsername, String.CASE_INSENSITIVE_ORDER))
                 .map(userAdminMapper::toDetail)
                 .toList();
     }
@@ -421,6 +487,7 @@ public class ClassManagementServiceImpl implements ClassManagementService {
                 .status(c.getStatus())
                 .enrollment(EnrollmentCountsPayload.builder().enrolled(enrolled).build())
                 .lessons(LessonsSummaryPayload.builder().total(lessonTotal).build())
+                .gradingWeights(toGradingWeights(c))
                 .createdAt(c.getCreatedAt())
                 .updatedAt(c.getUpdatedAt())
                 .build();
@@ -431,5 +498,54 @@ public class ClassManagementServiceImpl implements ClassManagementService {
             return null;
         }
         return s.trim();
+    }
+
+    private List<ScoreComponentPayload> buildScoreComponents() {
+        return classesProperties.getScoreComponents().stream()
+                .map(c -> ScoreComponentPayload.builder()
+                        .key(c.getKey())
+                        .label(c.getLabel())
+                        .color(c.getColor())
+                        .build())
+                .toList();
+    }
+
+    private void applyDefaultGradingWeights(LmsClass entity) {
+        ClassesProperties.GradingWeights gw = classesProperties.getGradingWeights();
+        entity.setWeightAttendance(gw.getAttendance());
+        entity.setWeightAssignment(gw.getAssignment());
+        entity.setWeightQuiz(gw.getQuiz());
+        entity.setWeightMidterm(gw.getMidterm());
+        entity.setWeightFinalExam(gw.getFinalExam());
+    }
+
+    private void applyGradingWeights(LmsClass entity, GradingWeightsPayload weights) {
+        int attendance = weights.getAttendance();
+        int assignment = weights.getAssignment();
+        int quiz = weights.getQuiz();
+        int midterm = weights.getMidterm();
+        int finalExam = weights.getFinalExam();
+        int sum = attendance + assignment + quiz + midterm + finalExam;
+        if (sum != 100) {
+            throw new BusinessException(ExceptionCode.VALIDATION_ERROR);
+        }
+        if (attendance < 0 || assignment < 0 || quiz < 0 || midterm < 0 || finalExam < 0) {
+            throw new BusinessException(ExceptionCode.VALIDATION_ERROR);
+        }
+        entity.setWeightAttendance(attendance);
+        entity.setWeightAssignment(assignment);
+        entity.setWeightQuiz(quiz);
+        entity.setWeightMidterm(midterm);
+        entity.setWeightFinalExam(finalExam);
+    }
+
+    private static GradingWeightsPayload toGradingWeights(LmsClass c) {
+        return GradingWeightsPayload.builder()
+                .attendance(c.getWeightAttendance())
+                .assignment(c.getWeightAssignment())
+                .quiz(c.getWeightQuiz())
+                .midterm(c.getWeightMidterm())
+                .finalExam(c.getWeightFinalExam())
+                .build();
     }
 }

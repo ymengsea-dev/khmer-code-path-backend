@@ -30,4 +30,6 @@ public class UpdateClassRequest {
     private String roomNumber;
 
     private ClassStatus status;
+
+    private GradingWeightsPayload gradingWeights;
 }

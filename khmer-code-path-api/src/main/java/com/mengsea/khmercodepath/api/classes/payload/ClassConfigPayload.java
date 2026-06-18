@@ -14,4 +14,5 @@ public class ClassConfigPayload {
     private List<String> cardGradients;
     private ClassCreateDefaultsPayload createDefaults;
     private GradingWeightsPayload gradingWeights;
+    private List<ScoreComponentPayload> scoreComponents;
 }

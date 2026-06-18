@@ -65,6 +65,21 @@ public class LmsClass {
     @Column(nullable = false)
     private boolean deleted = false;
 
+    @Column(name = "weight_attendance", nullable = false)
+    private int weightAttendance = 10;
+
+    @Column(name = "weight_assignment", nullable = false)
+    private int weightAssignment = 10;
+
+    @Column(name = "weight_quiz", nullable = false)
+    private int weightQuiz = 5;
+
+    @Column(name = "weight_midterm", nullable = false)
+    private int weightMidterm = 25;
+
+    @Column(name = "weight_final_exam", nullable = false)
+    private int weightFinalExam = 50;
+
     @CreationTimestamp
     private LocalDateTime createdAt;
 

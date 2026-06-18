@@ -74,4 +74,42 @@ public interface AttendanceRecordRepository extends JpaRepository<AttendanceReco
             @Param("studentUuid") String studentUuid,
             @Param("status") String status
     );
+
+    List<AttendanceRecord> findByLmsClass_IdOrderBySessionDateAscStudent_UsernameAsc(Long classId);
+
+    @Query("""
+            SELECT a FROM AttendanceRecord a
+            WHERE a.lmsClass.id = :classId
+            AND a.sessionDate >= :dateFrom
+            AND a.sessionDate <= :dateTo
+            ORDER BY a.sessionDate ASC, a.student.username ASC
+            """)
+    List<AttendanceRecord> findByClassIdAndSessionDateBetween(
+            @Param("classId") Long classId,
+            @Param("dateFrom") LocalDate dateFrom,
+            @Param("dateTo") LocalDate dateTo
+    );
+
+    @Query("""
+            SELECT DISTINCT a.sessionDate FROM AttendanceRecord a
+            WHERE a.lmsClass.id = :classId
+            ORDER BY a.sessionDate DESC
+            """)
+    List<LocalDate> findDistinctSessionDatesByClassId(@Param("classId") Long classId);
+
+    @Query("""
+            SELECT COUNT(a) FROM AttendanceRecord a
+            WHERE a.lmsClass.id = :classId
+            AND a.student.uuid = :studentUuid
+            AND a.status = :status
+            AND a.sessionDate >= :dateFrom
+            AND a.sessionDate <= :dateTo
+            """)
+    long countByClassStudentStatusAndSessionDateBetween(
+            @Param("classId") Long classId,
+            @Param("studentUuid") String studentUuid,
+            @Param("status") String status,
+            @Param("dateFrom") LocalDate dateFrom,
+            @Param("dateTo") LocalDate dateTo
+    );
 }

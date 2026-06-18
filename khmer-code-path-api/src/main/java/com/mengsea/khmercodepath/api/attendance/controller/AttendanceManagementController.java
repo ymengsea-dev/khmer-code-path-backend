@@ -1,11 +1,8 @@
 package com.mengsea.khmercodepath.api.attendance.controller;
 
-import com.mengsea.khmercodepath.api.attendance.payload.AttendanceRecordPayload;
-import com.mengsea.khmercodepath.api.attendance.payload.AttendanceSessionPayload;
-import com.mengsea.khmercodepath.api.attendance.payload.AttendanceStatisticsPayload;
-import com.mengsea.khmercodepath.api.attendance.payload.BulkAttendanceRequest;
-import com.mengsea.khmercodepath.api.attendance.payload.RecordAttendanceRequest;
-import com.mengsea.khmercodepath.api.attendance.payload.UpdateAttendanceRequest;
+import com.mengsea.khmercodepath.api.attendance.payload.AttendanceManagementConfigPayload;
+import com.mengsea.khmercodepath.api.attendance.payload.AttendanceRosterPayload;
+import com.mengsea.khmercodepath.api.attendance.payload.SetAttendanceWarningRequest;
 import com.mengsea.khmercodepath.api.attendance.service.AttendanceManagementService;
 import com.mengsea.khmercodepath.commons.api.ApiResponse;
 import com.mengsea.khmercodepath.commons.api.ApiResponses;
@@ -17,96 +14,82 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
-
 @RestController
-@RequestMapping("/api/v1/attendance")
+@RequestMapping("/api/v1/attendance-management")
 @RequiredArgsConstructor
-@Tag(name = "Attendance", description = "ATT — attendance records (V3 tables)")
+@Tag(name = "Attendance Management", description = "Teacher attendance roster and warnings")
 @SecurityRequirement(name = SwaggerConfig.SECURITY_SCHEME_NAME)
 public class AttendanceManagementController {
 
     private final AttendanceManagementService attendanceManagementService;
 
-    @Operation(summary = "ATT-1000 · Record attendance")
-    @PostMapping("/sessions/{sessionId}/records")
-    @PreAuthorize("hasAuthority('" + LmsAuthority.ATT_MANAGE + "')")
-    public ResponseEntity<ApiResponse<AttendanceRecordPayload>> recordAttendance(
-            @PathVariable String sessionId,
-            @Valid @RequestBody RecordAttendanceRequest request
-    ) {
-        AttendanceRecordPayload data = attendanceManagementService.recordAttendance(sessionId, request);
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponses.of("ATT-1000", LmsStatusCode.CREATED, null, data));
-    }
-
-    @Operation(summary = "ATT-1010 · Bulk record attendance")
-    @PostMapping("/sessions/{sessionId}/records/bulk")
-    @PreAuthorize("hasAuthority('" + LmsAuthority.ATT_MANAGE + "')")
-    public ResponseEntity<ApiResponse<List<AttendanceRecordPayload>>> bulkRecord(
-            @PathVariable String sessionId,
-            @Valid @RequestBody BulkAttendanceRequest request
-    ) {
-        List<AttendanceRecordPayload> data =
-                attendanceManagementService.bulkRecordAttendance(sessionId, request);
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponses.of("ATT-1010", LmsStatusCode.CREATED, null, data));
-    }
-
-    @Operation(summary = "ATT-1020 · Update attendance record")
-    @PutMapping("/records/{recordId}")
-    @PreAuthorize("hasAuthority('" + LmsAuthority.ATT_MANAGE + "')")
-    public ResponseEntity<ApiResponse<AttendanceRecordPayload>> updateAttendance(
-            @PathVariable Long recordId,
-            @Valid @RequestBody UpdateAttendanceRequest request
-    ) {
-        AttendanceRecordPayload data = attendanceManagementService.updateAttendance(recordId, request);
-        return ResponseEntity.ok(ApiResponses.of("ATT-1020", LmsStatusCode.SUCCESS, null, data));
-    }
-
-    @Operation(summary = "ATT-1030 · Attendance by session")
-    @GetMapping("/sessions/{sessionId}")
-    @PreAuthorize("hasAuthority('" + LmsAuthority.CLS_READ + "')")
-    public ResponseEntity<ApiResponse<AttendanceSessionPayload>> getSession(
-            @PathVariable String sessionId
-    ) {
-        AttendanceSessionPayload data = attendanceManagementService.getSessionAttendance(sessionId);
-        return ResponseEntity.ok(ApiResponses.of("ATT-1030", LmsStatusCode.SUCCESS, null, data));
-    }
-
-    @Operation(summary = "ATT-1040 · Attendance by student")
-    @GetMapping("/students/{studentId}")
-    @PreAuthorize("hasAuthority('" + LmsAuthority.CLS_READ + "')")
-    public ResponseEntity<ApiResponse<List<AttendanceRecordPayload>>> getByStudent(
-            @PathVariable String studentId,
+    @Operation(summary = "ATT-0900 · Attendance management UI config")
+    @GetMapping("/config")
+    @PreAuthorize("hasAnyAuthority('" + LmsAuthority.ATT_MANAGE + "', '" + LmsAuthority.CLS_READ + "')")
+    public ResponseEntity<ApiResponse<AttendanceManagementConfigPayload>> getConfig(
             @RequestParam(required = false) Long classId
     ) {
-        List<AttendanceRecordPayload> data =
-                attendanceManagementService.getStudentAttendance(studentId, classId);
-        return ResponseEntity.ok(ApiResponses.of("ATT-1040", LmsStatusCode.SUCCESS, null, data));
+        AttendanceManagementConfigPayload data = attendanceManagementService.getManagementConfig(classId);
+        return ResponseEntity.ok(ApiResponses.of("ATT-0900", LmsStatusCode.SUCCESS, null, data));
     }
 
-    @Operation(summary = "ATT-1050 · Attendance statistics")
-    @GetMapping("/statistics")
-    @PreAuthorize("hasAuthority('" + LmsAuthority.CLS_READ + "')")
-    public ResponseEntity<ApiResponse<AttendanceStatisticsPayload>> statistics(
-            @RequestParam(required = false) Long classId,
-            @RequestParam(required = false) String studentId
+    @Operation(summary = "ATT-0910 · Class attendance roster")
+    @GetMapping("/roster")
+    @PreAuthorize("hasAnyAuthority('" + LmsAuthority.ATT_MANAGE + "', '" + LmsAuthority.CLS_READ + "')")
+    public ResponseEntity<ApiResponse<AttendanceRosterPayload>> getRoster(
+            @RequestParam Long classId,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String month
     ) {
-        AttendanceStatisticsPayload data =
-                attendanceManagementService.getStatistics(classId, studentId);
-        return ResponseEntity.ok(ApiResponses.of("ATT-1050", LmsStatusCode.SUCCESS, null, data));
+        AttendanceRosterPayload data = attendanceManagementService.getRoster(classId, search, month);
+        return ResponseEntity.ok(ApiResponses.of("ATT-0910", LmsStatusCode.SUCCESS, null, data));
+    }
+
+    @Operation(summary = "ATT-0920 · Set or clear attendance warning")
+    @PatchMapping("/classes/{classId}/students/{studentId}/warning")
+    @PreAuthorize("hasAuthority('" + LmsAuthority.ATT_MANAGE + "')")
+    public ResponseEntity<ApiResponse<AttendanceRosterPayload>> setWarning(
+            @PathVariable Long classId,
+            @PathVariable String studentId,
+            @Valid @RequestBody SetAttendanceWarningRequest request
+    ) {
+        AttendanceRosterPayload data = attendanceManagementService.setAttendanceWarning(
+                classId,
+                studentId,
+                Boolean.TRUE.equals(request.getWarned())
+        );
+        return ResponseEntity.ok(ApiResponses.of("ATT-0920", LmsStatusCode.SUCCESS, null, data));
+    }
+
+    @Operation(summary = "ATT-1060 · Export class attendance to Excel")
+    @GetMapping("/export")
+    @PreAuthorize("hasAnyAuthority('" + LmsAuthority.ATT_MANAGE + "', '" + LmsAuthority.CLS_READ + "')")
+    public ResponseEntity<byte[]> exportAttendance(
+            @RequestParam Long classId,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String month
+    ) {
+        var resource = attendanceManagementService.exportAttendanceExcel(
+                classId,
+                search,
+                month
+        );
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + resource.getFilename() + "\"")
+                .contentType(MediaType.parseMediaType(
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(resource.getContent());
     }
 }

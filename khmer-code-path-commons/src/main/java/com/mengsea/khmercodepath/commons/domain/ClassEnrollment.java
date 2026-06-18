@@ -47,4 +47,10 @@ public class ClassEnrollment {
 
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
+
+    @Column(name = "attendance_warned", nullable = false)
+    private boolean attendanceWarned = false;
+
+    @Column(name = "attendance_warned_at")
+    private LocalDateTime attendanceWarnedAt;
 }

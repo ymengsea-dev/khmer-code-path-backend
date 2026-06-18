@@ -1,6 +1,7 @@
 package com.mengsea.khmercodepath.api.classes.service;
 
 import com.mengsea.khmercodepath.api.classes.payload.AssignStudentsRequest;
+import com.mengsea.khmercodepath.api.classes.payload.ClassSettingsConfigPayload;
 import com.mengsea.khmercodepath.api.classes.payload.ClassConfigPayload;
 import com.mengsea.khmercodepath.api.classes.payload.ClassDetailPayload;
 import com.mengsea.khmercodepath.api.classes.payload.ClassPagePayload;
@@ -39,4 +40,8 @@ public interface ClassManagementService {
     void removeStudents(Long id, RemoveStudentsRequest request);
 
     List<UserDetailPayload> listClassStudents(Long id);
+
+    List<UserDetailPayload> listInviteCandidates(Long id);
+
+    ClassSettingsConfigPayload getClassSettingsConfig(Long id);
 }

@@ -6,6 +6,7 @@ import com.mengsea.khmercodepath.api.classes.payload.ClassCommentPayload;
 import com.mengsea.khmercodepath.api.classes.payload.ClassDetailPayload;
 import com.mengsea.khmercodepath.api.classes.payload.ClassInvitationPayload;
 import com.mengsea.khmercodepath.api.classes.payload.ClassPagePayload;
+import com.mengsea.khmercodepath.api.classes.payload.ClassSettingsConfigPayload;
 import com.mengsea.khmercodepath.api.classes.payload.CreateClassCommentRequest;
 import com.mengsea.khmercodepath.api.classes.payload.CreateClassRequest;
 import com.mengsea.khmercodepath.api.classes.payload.RemoveStudentsRequest;
@@ -75,6 +76,14 @@ public class ClassManagementController {
     public ResponseEntity<ApiResponse<ClassDetailPayload>> getClass(@PathVariable Long id) {
         ClassDetailPayload data = classManagementService.getClass(id);
         return ResponseEntity.ok(ApiResponses.of("CLS-0310", LmsStatusCode.SUCCESS, null, data));
+    }
+
+    @Operation(summary = "CLS-0315 · Class settings page config (tabs, score components)")
+    @GetMapping("/{id}/settings/config")
+    @PreAuthorize("hasAuthority('" + LmsAuthority.CLS_MANAGE + "')")
+    public ResponseEntity<ApiResponse<ClassSettingsConfigPayload>> getClassSettingsConfig(@PathVariable Long id) {
+        ClassSettingsConfigPayload data = classManagementService.getClassSettingsConfig(id);
+        return ResponseEntity.ok(ApiResponses.of("CLS-0315", LmsStatusCode.SUCCESS, null, data));
     }
 
     @Operation(summary = "CLS-0320 · Create class")
@@ -171,6 +180,14 @@ public class ClassManagementController {
     public ResponseEntity<ApiResponse<List<UserDetailPayload>>> listClassStudents(@PathVariable Long id) {
         List<UserDetailPayload> data = classManagementService.listClassStudents(id);
         return ResponseEntity.ok(ApiResponses.of("CLS-0370", LmsStatusCode.SUCCESS, null, data));
+    }
+
+    @Operation(summary = "CLS-0371 · List students available to invite to class")
+    @GetMapping("/{id}/students/invite-candidates")
+    @PreAuthorize("hasAuthority('" + LmsAuthority.CLS_READ + "')")
+    public ResponseEntity<ApiResponse<List<UserDetailPayload>>> listInviteCandidates(@PathVariable Long id) {
+        List<UserDetailPayload> data = classManagementService.listInviteCandidates(id);
+        return ResponseEntity.ok(ApiResponses.of("CLS-0371", LmsStatusCode.SUCCESS, null, data));
     }
 
     @Operation(summary = "CLS-0380 · List class comments")

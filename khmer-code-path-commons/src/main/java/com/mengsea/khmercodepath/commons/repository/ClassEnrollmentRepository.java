@@ -18,6 +18,8 @@ public interface ClassEnrollmentRepository extends JpaRepository<ClassEnrollment
 
     boolean existsByLmsClass_IdAndStudent_Uuid(Long classId, String studentUuid);
 
+    java.util.Optional<ClassEnrollment> findByLmsClass_IdAndStudent_Uuid(Long classId, String studentUuid);
+
     boolean existsByStudent_UuidAndLmsClass_Teacher_Uuid(String studentUuid, String teacherUuid);
 
     @EntityGraph(attributePaths = {"student", "lmsClass"})

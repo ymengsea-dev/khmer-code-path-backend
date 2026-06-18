@@ -26,6 +26,7 @@ public class ClassDetailPayload {
     private ClassStatus status;
     private EnrollmentCountsPayload enrollment;
     private LessonsSummaryPayload lessons;
+    private GradingWeightsPayload gradingWeights;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

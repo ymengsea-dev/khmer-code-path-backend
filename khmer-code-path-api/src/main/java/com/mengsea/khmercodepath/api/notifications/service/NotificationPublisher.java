@@ -122,6 +122,19 @@ public class NotificationPublisher {
         );
     }
 
+    public void onAttendanceWarning(LmsClass lmsClass, User student) {
+        notifyUser(
+                student.getUuid(),
+                NotificationType.SYSTEM,
+                "Attendance warning",
+                "Your teacher issued an attendance warning for " + lmsClass.getName()
+                        + ". Please improve your attendance.",
+                lmsClass.getId(),
+                "attendance_warning",
+                null
+        );
+    }
+
     public void onClassQuestion(Long classId, User author, String bodyPreview) {
         LmsClass lmsClass = lmsClassRepository.findByIdAndDeletedFalse(classId).orElse(null);
         if (lmsClass == null) {

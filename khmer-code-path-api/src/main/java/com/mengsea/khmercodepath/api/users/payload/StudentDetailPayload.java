@@ -1,29 +1,26 @@
 package com.mengsea.khmercodepath.api.users.payload;
 
-import com.mengsea.khmercodepath.commons.constant.Provider;
-import com.mengsea.khmercodepath.commons.constant.Role;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class UserDetailPayload {
+public class StudentDetailPayload {
     private String id;
     private String name;
     private String email;
-    private Role role;
-    private boolean isActive;
-    private String avatarUrl;
     private String studentId;
-    private String teacherId;
-    private Provider provider;
-    private boolean deleted;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
+    private boolean isActive;
+    private String bio;
+    private String avatarUrl;
+    private String enrolledClasses;
+    private List<String> enrolledClassIds;
+    private LocalDateTime memberSince;
 }

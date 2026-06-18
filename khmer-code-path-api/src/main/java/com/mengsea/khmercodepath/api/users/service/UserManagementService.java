@@ -2,6 +2,9 @@ package com.mengsea.khmercodepath.api.users.service;
 
 import com.mengsea.khmercodepath.api.users.payload.CreateUserRequest;
 import com.mengsea.khmercodepath.api.users.payload.UpdateUserRequest;
+import com.mengsea.khmercodepath.api.users.payload.StudentDetailPayload;
+import com.mengsea.khmercodepath.api.users.payload.StudentPagePayload;
+import com.mengsea.khmercodepath.api.users.payload.UserManagementConfigPayload;
 import com.mengsea.khmercodepath.api.users.payload.UserDetailPayload;
 import com.mengsea.khmercodepath.api.users.payload.UserImportResultPayload;
 import com.mengsea.khmercodepath.api.users.payload.UserPagePayload;
@@ -11,6 +14,12 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.web.multipart.MultipartFile;
 
 public interface UserManagementService {
+
+    UserManagementConfigPayload getConfig();
+
+    StudentPagePayload listStudents(String classId, String search, Boolean isActive);
+
+    StudentDetailPayload getStudent(String id);
 
     UserPagePayload listUsers(String name, String email, Role role, Boolean isActive, boolean includeDeleted, Pageable pageable);
 

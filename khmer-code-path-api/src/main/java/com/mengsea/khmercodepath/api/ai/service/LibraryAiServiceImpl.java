@@ -77,7 +77,7 @@ public class LibraryAiServiceImpl implements LibraryAiService {
 
         if (plainText.isBlank()) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
-                    "This template has no written notes. Add content in the Course Content editor first.");
+                    "This template has no written notes. Add content in the Content Management editor first.");
         }
 
         String systemPrompt = """
@@ -110,7 +110,7 @@ public class LibraryAiServiceImpl implements LibraryAiService {
 
         if (plainText.isBlank()) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
-                    "This template has no written notes. Add content in the Course Content editor first.");
+                    "This template has no written notes. Add content in the Content Management editor first.");
         }
 
         String systemPrompt = """

@@ -17,6 +17,23 @@ public class ClassesProperties {
     private List<LessonTabEntry> lessonTabs = defaultLessonTabs();
     private CreateDefaults createDefaults = new CreateDefaults();
     private GradingWeights gradingWeights = new GradingWeights();
+    private List<SettingsTabEntry> settingsTabs = defaultSettingsTabs();
+    private List<ScoreComponentEntry> scoreComponents = defaultScoreComponents();
+
+    @Getter
+    @Setter
+    public static class SettingsTabEntry {
+        private String id;
+        private String label;
+    }
+
+    @Getter
+    @Setter
+    public static class ScoreComponentEntry {
+        private String key;
+        private String label;
+        private String color;
+    }
 
     @Getter
     @Setter
@@ -66,6 +83,41 @@ public class ClassesProperties {
         LessonTabEntry e = new LessonTabEntry();
         e.setId(id);
         e.setLabel(label);
+        return e;
+    }
+
+    private static List<SettingsTabEntry> defaultSettingsTabs() {
+        List<SettingsTabEntry> tabs = new ArrayList<>();
+        tabs.add(settingsTab("general", "General"));
+        tabs.add(settingsTab("grading", "Score breakdown"));
+        tabs.add(settingsTab("students", "Students"));
+        tabs.add(settingsTab("lessons", "Lessons"));
+        tabs.add(settingsTab("quizzes", "Quizzes"));
+        return tabs;
+    }
+
+    private static SettingsTabEntry settingsTab(String id, String label) {
+        SettingsTabEntry e = new SettingsTabEntry();
+        e.setId(id);
+        e.setLabel(label);
+        return e;
+    }
+
+    private static List<ScoreComponentEntry> defaultScoreComponents() {
+        List<ScoreComponentEntry> items = new ArrayList<>();
+        items.add(scoreComponent("attendance", "Attendance", "emerald"));
+        items.add(scoreComponent("assignment", "Assignment", "blue"));
+        items.add(scoreComponent("quiz", "Quiz", "violet"));
+        items.add(scoreComponent("midterm", "Mid-term", "amber"));
+        items.add(scoreComponent("finalExam", "Final", "rose"));
+        return items;
+    }
+
+    private static ScoreComponentEntry scoreComponent(String key, String label, String color) {
+        ScoreComponentEntry e = new ScoreComponentEntry();
+        e.setKey(key);
+        e.setLabel(label);
+        e.setColor(color);
         return e;
     }
 }

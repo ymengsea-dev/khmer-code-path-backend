@@ -14,6 +14,7 @@ public class UserAdminMapper {
                 .email(user.getEmail())
                 .role(user.getRole())
                 .isActive(user.isActive())
+                .avatarUrl(resolveAvatarUrl(user))
                 .studentId(user.getStudentId())
                 .teacherId(user.getTeacherId())
                 .provider(user.getProvider())
@@ -21,5 +22,12 @@ public class UserAdminMapper {
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
                 .build();
+    }
+
+    private static String resolveAvatarUrl(User user) {
+        if (user.getAvatarStorageKey() == null || user.getAvatarStorageKey().isBlank()) {
+            return null;
+        }
+        return "/api/v1/profile/avatar/" + user.getUuid();
     }
 }

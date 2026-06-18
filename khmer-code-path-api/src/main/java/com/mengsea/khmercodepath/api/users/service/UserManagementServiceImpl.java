@@ -1,20 +1,35 @@
 package com.mengsea.khmercodepath.api.users.service;
 
 import com.mengsea.khmercodepath.api.users.mapper.UserAdminMapper;
+import com.mengsea.khmercodepath.api.users.payload.ClassFilterPayload;
 import com.mengsea.khmercodepath.api.users.payload.CreateUserRequest;
+import com.mengsea.khmercodepath.api.users.payload.StudentDetailPayload;
+import com.mengsea.khmercodepath.api.users.payload.StudentPagePayload;
+import com.mengsea.khmercodepath.api.users.payload.StudentSummaryPayload;
+import com.mengsea.khmercodepath.api.users.payload.StatusFilterPayload;
+import com.mengsea.khmercodepath.api.users.payload.UserManagementActionsPayload;
+import com.mengsea.khmercodepath.api.users.payload.UserManagementConfigPayload;
+import com.mengsea.khmercodepath.api.users.payload.UserTabPayload;
 import com.mengsea.khmercodepath.api.users.payload.UpdateUserRequest;
 import com.mengsea.khmercodepath.api.users.payload.UserDetailPayload;
 import com.mengsea.khmercodepath.api.users.payload.UserImportErrorPayload;
 import com.mengsea.khmercodepath.api.users.payload.UserImportResultPayload;
 import com.mengsea.khmercodepath.api.users.payload.UserPagePayload;
 import com.mengsea.khmercodepath.api.users.payload.UserStatusRequest;
+import com.mengsea.khmercodepath.commons.constant.ClassStatus;
 import com.mengsea.khmercodepath.commons.constant.ExceptionCode;
 import com.mengsea.khmercodepath.commons.constant.Provider;
 import com.mengsea.khmercodepath.commons.constant.Role;
+import com.mengsea.khmercodepath.commons.domain.ClassEnrollment;
+import com.mengsea.khmercodepath.commons.domain.LmsClass;
 import com.mengsea.khmercodepath.commons.domain.User;
 import com.mengsea.khmercodepath.commons.exception.BusinessException;
+import com.mengsea.khmercodepath.commons.repository.ClassEnrollmentRepository;
+import com.mengsea.khmercodepath.commons.repository.LmsClassRepository;
+import com.mengsea.khmercodepath.commons.repository.LmsClassSpecifications;
 import com.mengsea.khmercodepath.commons.repository.UserRepository;
 import com.mengsea.khmercodepath.commons.repository.UserSpecifications;
+import com.mengsea.khmercodepath.commons.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
@@ -35,11 +50,16 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -48,6 +68,275 @@ public class UserManagementServiceImpl implements UserManagementService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final UserAdminMapper userAdminMapper;
+    private final LmsClassRepository lmsClassRepository;
+    private final ClassEnrollmentRepository classEnrollmentRepository;
+
+    private static final List<StatusFilterPayload> STATUS_FILTERS = List.of(
+            StatusFilterPayload.builder().value("all").label("All Status").build(),
+            StatusFilterPayload.builder().value("active").label("Active").build(),
+            StatusFilterPayload.builder().value("inactive").label("Inactive").build()
+    );
+
+    private static final List<UserTabPayload> ADMIN_TABS = List.of(
+            UserTabPayload.builder().id("all").label("All Users").build(),
+            UserTabPayload.builder().id("students").label("Students").build(),
+            UserTabPayload.builder().id("teachers").label("Teachers").build(),
+            UserTabPayload.builder().id("admins").label("Administrators").build(),
+            UserTabPayload.builder().id("permissions").label("Roles & Permissions").build()
+    );
+
+    private static final List<String> CARD_GRADIENTS = List.of(
+            "from-violet-500 to-indigo-600",
+            "from-sky-500 to-blue-600",
+            "from-emerald-500 to-teal-600",
+            "from-fuchsia-500 to-purple-600",
+            "from-amber-500 to-orange-600",
+            "from-rose-500 to-pink-600"
+    );
+
+    @Override
+    @Transactional(readOnly = true)
+    public UserManagementConfigPayload getConfig() {
+        User me = SecurityUtils.requireCurrentUser();
+        boolean isAdmin = me.getRole() == Role.ADMIN;
+        List<ClassFilterPayload> classFilters = buildClassFilters(me);
+
+        if (isAdmin) {
+            return UserManagementConfigPayload.builder()
+                    .pageTitle("Student Management")
+                    .pageDescription("Manage students, teachers, and institution-wide access control.")
+                    .tabs(ADMIN_TABS)
+                    .statusFilters(STATUS_FILTERS)
+                    .classFilters(classFilters)
+                    .cardGradients(CARD_GRADIENTS)
+                    .actions(UserManagementActionsPayload.builder()
+                            .canAdd(true)
+                            .canImport(true)
+                            .canEditStatus(true)
+                            .build())
+                    .build();
+        }
+
+        return UserManagementConfigPayload.builder()
+                .pageTitle("Student Management")
+                .pageDescription("Students enrolled in your classes.")
+                .tabs(List.of())
+                .statusFilters(STATUS_FILTERS)
+                .classFilters(classFilters)
+                .cardGradients(CARD_GRADIENTS)
+                .actions(UserManagementActionsPayload.builder()
+                        .canAdd(false)
+                        .canImport(false)
+                        .canEditStatus(false)
+                        .build())
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public StudentPagePayload listStudents(String classIdParam, String search, Boolean isActive) {
+        User me = SecurityUtils.requireCurrentUser();
+        if (me.getRole() != Role.ADMIN && me.getRole() != Role.TEACHER) {
+            throw new BusinessException(ExceptionCode.ACCESS_DENIED);
+        }
+
+        Long classId = parseClassId(classIdParam);
+        List<LmsClass> classes = resolveAccessibleClasses(me, classId);
+        Map<String, StudentAccumulator> students = new LinkedHashMap<>();
+
+        for (LmsClass lmsClass : classes) {
+            List<ClassEnrollment> enrollments =
+                    classEnrollmentRepository.findByLmsClass_IdOrderByEnrolledAtAsc(lmsClass.getId());
+            for (ClassEnrollment enrollment : enrollments) {
+                User student = enrollment.getStudent();
+                if (student == null || student.isDeleted() || student.getRole() != Role.STUDENT) {
+                    continue;
+                }
+                StudentAccumulator acc = students.computeIfAbsent(
+                        student.getUuid(),
+                        id -> StudentAccumulator.from(student)
+                );
+                acc.addClass(lmsClass);
+            }
+        }
+
+        if (me.getRole() == Role.ADMIN && classId == null) {
+            Specification<User> spec = Specification.where(UserSpecifications.deletedFlag(false))
+                    .and(UserSpecifications.roleEquals(Role.STUDENT))
+                    .and(UserSpecifications.activeEquals(isActive));
+            for (User student : userRepository.findAll(spec)) {
+                students.computeIfAbsent(student.getUuid(), id -> StudentAccumulator.from(student));
+            }
+        }
+
+        List<StudentSummaryPayload> items = students.values().stream()
+                .map(StudentAccumulator::toPayload)
+                .filter(row -> matchesStudentSearch(row, search))
+                .filter(row -> matchesStudentActive(row, isActive))
+                .sorted(Comparator.comparing(StudentSummaryPayload::getName, String.CASE_INSENSITIVE_ORDER))
+                .toList();
+
+        return StudentPagePayload.builder()
+                .items(items)
+                .totalElements(items.size())
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public StudentDetailPayload getStudent(String id) {
+        User me = SecurityUtils.requireCurrentUser();
+        if (me.getRole() != Role.ADMIN && me.getRole() != Role.TEACHER) {
+            throw new BusinessException(ExceptionCode.ACCESS_DENIED);
+        }
+
+        User student = userRepository.findByUuidAndDeletedFalse(id)
+                .orElseThrow(() -> new BusinessException(ExceptionCode.USER_NOT_FOUND));
+        if (student.getRole() != Role.STUDENT) {
+            throw new BusinessException(ExceptionCode.STUDENT_NOT_FOUND);
+        }
+
+        if (me.getRole() == Role.TEACHER
+                && !classEnrollmentRepository.existsByStudent_UuidAndLmsClass_Teacher_Uuid(
+                id, me.getUuid())) {
+            throw new BusinessException(ExceptionCode.ACCESS_DENIED);
+        }
+
+        StudentAccumulator acc = StudentAccumulator.from(student);
+        List<ClassEnrollment> enrollments =
+                classEnrollmentRepository.findByStudent_UuidOrderByEnrolledAtDesc(id);
+        for (ClassEnrollment enrollment : enrollments) {
+            LmsClass lmsClass = enrollment.getLmsClass();
+            if (lmsClass == null || lmsClass.isDeleted()) {
+                continue;
+            }
+            if (me.getRole() == Role.TEACHER
+                    && (lmsClass.getTeacher() == null
+                    || !me.getUuid().equals(lmsClass.getTeacher().getUuid()))) {
+                continue;
+            }
+            acc.addClass(lmsClass);
+        }
+
+        StudentSummaryPayload summary = acc.toPayload();
+        return StudentDetailPayload.builder()
+                .id(summary.getId())
+                .name(summary.getName())
+                .email(summary.getEmail())
+                .studentId(summary.getStudentId())
+                .isActive(summary.isActive())
+                .bio(student.getBio())
+                .avatarUrl(resolveAvatarUrl(student))
+                .enrolledClasses(summary.getEnrolledClasses())
+                .enrolledClassIds(summary.getEnrolledClassIds())
+                .memberSince(student.getCreatedAt())
+                .build();
+    }
+
+    private static String resolveAvatarUrl(User user) {
+        if (user.getAvatarStorageKey() == null || user.getAvatarStorageKey().isBlank()) {
+            return null;
+        }
+        return "/api/v1/profile/avatar/" + user.getUuid();
+    }
+
+    private List<ClassFilterPayload> buildClassFilters(User me) {
+        List<ClassFilterPayload> filters = new ArrayList<>();
+        filters.add(ClassFilterPayload.builder().value("all").label("All Classes").build());
+        for (LmsClass lmsClass : resolveAccessibleClasses(me, null)) {
+            filters.add(ClassFilterPayload.builder()
+                    .value(String.valueOf(lmsClass.getId()))
+                    .label(lmsClass.getName())
+                    .build());
+        }
+        return filters;
+    }
+
+    private List<LmsClass> resolveAccessibleClasses(User me, Long classId) {
+        Specification<LmsClass> spec = Specification.where(LmsClassSpecifications.notDeleted())
+                .and(LmsClassSpecifications.statusEquals(ClassStatus.ACTIVE));
+        if (me.getRole() == Role.TEACHER) {
+            spec = spec.and(LmsClassSpecifications.teacherUuidEquals(me.getUuid()));
+        }
+        if (classId != null) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("id"), classId));
+        }
+        return lmsClassRepository.findAll(
+                spec,
+                org.springframework.data.domain.Sort.by("name").ascending()
+        );
+    }
+
+    private Long parseClassId(String classIdParam) {
+        if (classIdParam == null || classIdParam.isBlank() || "all".equalsIgnoreCase(classIdParam)) {
+            return null;
+        }
+        try {
+            return Long.parseLong(classIdParam.trim());
+        } catch (NumberFormatException ex) {
+            throw new BusinessException(ExceptionCode.CLASS_NOT_FOUND);
+        }
+    }
+
+    private boolean matchesStudentSearch(StudentSummaryPayload row, String search) {
+        if (search == null || search.isBlank()) {
+            return true;
+        }
+        String needle = search.trim().toLowerCase(Locale.ROOT);
+        return row.getName().toLowerCase(Locale.ROOT).contains(needle)
+                || row.getEmail().toLowerCase(Locale.ROOT).contains(needle)
+                || (row.getStudentId() != null
+                && row.getStudentId().toLowerCase(Locale.ROOT).contains(needle));
+    }
+
+    private boolean matchesStudentActive(StudentSummaryPayload row, Boolean isActive) {
+        if (isActive == null) {
+            return true;
+        }
+        return row.isActive() == isActive;
+    }
+
+    private static final class StudentAccumulator {
+        private final String id;
+        private final String name;
+        private final String email;
+        private final String studentId;
+        private final boolean active;
+        private final String avatarUrl;
+        private final Set<String> classNames = new LinkedHashSet<>();
+        private final List<String> classIds = new ArrayList<>();
+
+        private StudentAccumulator(User student) {
+            this.id = student.getUuid();
+            this.name = student.getUsername();
+            this.email = student.getEmail();
+            this.studentId = student.getStudentId();
+            this.active = student.isActive();
+            this.avatarUrl = resolveAvatarUrl(student);
+        }
+
+        static StudentAccumulator from(User student) {
+            return new StudentAccumulator(student);
+        }
+
+        void addClass(LmsClass lmsClass) {
+            classNames.add(lmsClass.getName());
+            classIds.add(String.valueOf(lmsClass.getId()));
+        }
+
+        StudentSummaryPayload toPayload() {
+            return StudentSummaryPayload.builder()
+                    .id(id)
+                    .name(name)
+                    .email(email)
+                    .studentId(studentId)
+                    .isActive(active)
+                    .avatarUrl(avatarUrl)
+                    .enrolledClasses(classNames.stream().collect(Collectors.joining(", ")))
+                    .enrolledClassIds(List.copyOf(classIds))
+                    .build();
+        }
+    }
 
     @Override
     @Transactional(readOnly = true)
