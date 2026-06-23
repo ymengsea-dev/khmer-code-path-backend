@@ -1,6 +1,7 @@
 package com.mengsea.khmercodepath.api.classes.payload;
 
 import com.mengsea.khmercodepath.commons.constant.ClassStatus;
+import com.mengsea.khmercodepath.commons.constant.ClassVisibility;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -21,6 +22,8 @@ public class ClassSummaryPayload {
     private String semester;
     private Integer academicYear;
     private ClassStatus status;
+    private ClassVisibility visibility;
+    private String visibilityLabel;
     private String statusLabel;
     private String semesterLabel;
     private String cardGradient;

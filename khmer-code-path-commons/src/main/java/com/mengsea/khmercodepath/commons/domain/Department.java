@@ -32,8 +32,13 @@ public class Department {
     @Column(nullable = false, length = 255)
     private String name;
 
-    @Column(length = 255)
-    private String faculty;
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "school_id", referencedColumnName = "id", nullable = false)
+    private School school;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "faculty_id", referencedColumnName = "id", nullable = false)
+    private Faculty facultyEntity;
 
     @Column(name = "head_of_dept", length = 255)
     private String headOfDept;

@@ -3,6 +3,7 @@ package com.mengsea.khmercodepath.commons.config.oauth;
 import com.mengsea.khmercodepath.commons.domain.CustomOauthUser;
 import com.mengsea.khmercodepath.commons.domain.CustomUserDetail;
 import com.mengsea.khmercodepath.commons.security.JwtService;
+import com.mengsea.khmercodepath.commons.security.UserPermissionResolver;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
@@ -21,6 +22,7 @@ import java.io.IOException;
 public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler {
 
     private final JwtService jwtService;
+    private final UserPermissionResolver userPermissionResolver;
 
     @Value("${app.frontend-url:http://localhost:3000}")
     private String frontendUrl;
@@ -28,7 +30,10 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response, Authentication authentication) throws IOException, ServletException {
         CustomOauthUser oauthUser = (CustomOauthUser) authentication.getPrincipal();
-        CustomUserDetail userDetail = new CustomUserDetail(oauthUser.getUser());
+        CustomUserDetail userDetail = new CustomUserDetail(
+                oauthUser.getUser(),
+                userPermissionResolver.resolve(oauthUser.getUser())
+        );
 
         String accessToken = jwtService.generateToken(userDetail);
         String refreshToken = jwtService.generateRefreshToken(userDetail);

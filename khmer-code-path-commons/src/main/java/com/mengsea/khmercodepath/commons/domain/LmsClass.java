@@ -1,6 +1,7 @@
 package com.mengsea.khmercodepath.commons.domain;
 
 import com.mengsea.khmercodepath.commons.constant.ClassStatus;
+import com.mengsea.khmercodepath.commons.constant.ClassVisibility;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -62,6 +63,10 @@ public class LmsClass {
     @Column(nullable = false, length = 32)
     private ClassStatus status = ClassStatus.ACTIVE;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 32)
+    private ClassVisibility visibility = ClassVisibility.PRIVATE;
+
     @Column(nullable = false)
     private boolean deleted = false;
 
@@ -79,6 +84,14 @@ public class LmsClass {
 
     @Column(name = "weight_final_exam", nullable = false)
     private int weightFinalExam = 50;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "school_id", referencedColumnName = "id")
+    private School school;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "department_id", referencedColumnName = "id")
+    private Department department;
 
     @CreationTimestamp
     private LocalDateTime createdAt;

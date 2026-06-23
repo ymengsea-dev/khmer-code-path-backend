@@ -1,6 +1,7 @@
 package com.mengsea.khmercodepath.commons.repository;
 
 import com.mengsea.khmercodepath.commons.constant.ClassStatus;
+import com.mengsea.khmercodepath.commons.constant.ClassVisibility;
 import com.mengsea.khmercodepath.commons.domain.ClassEnrollment;
 import com.mengsea.khmercodepath.commons.domain.LmsClass;
 import jakarta.persistence.criteria.Subquery;
@@ -51,6 +52,32 @@ public final class LmsClassSpecifications {
             return (root, query, cb) -> cb.conjunction();
         }
         return (root, query, cb) -> cb.equal(root.get("status"), status);
+    }
+
+    public static Specification<LmsClass> schoolIdEquals(Long schoolId) {
+        if (schoolId == null) {
+            return (root, query, cb) -> cb.conjunction();
+        }
+        return (root, query, cb) -> cb.equal(root.join("school").get("id"), schoolId);
+    }
+
+    public static Specification<LmsClass> visibilityEquals(ClassVisibility visibility) {
+        if (visibility == null) {
+            return (root, query, cb) -> cb.conjunction();
+        }
+        return (root, query, cb) -> cb.equal(root.get("visibility"), visibility);
+    }
+
+    public static Specification<LmsClass> publicActiveInSchool(Long schoolId) {
+        if (schoolId == null) {
+            return (root, query, cb) -> cb.disjunction();
+        }
+        return (root, query, cb) -> cb.and(
+                cb.equal(root.join("school").get("id"), schoolId),
+                cb.equal(root.get("visibility"), ClassVisibility.PUBLIC),
+                cb.equal(root.get("status"), ClassStatus.ACTIVE),
+                cb.isFalse(root.get("deleted"))
+        );
     }
 
     /** Classes where the given student user is enrolled. */

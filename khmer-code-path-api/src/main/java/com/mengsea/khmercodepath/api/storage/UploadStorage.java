@@ -16,6 +16,10 @@ public interface UploadStorage {
 
     StoredFile storeAvatar(String userId, MultipartFile file);
 
+    StoredFile storeSchoolCover(Long schoolId, MultipartFile file);
+
+    StoredFile storeFacultyCover(Long facultyId, MultipartFile file);
+
     Resource loadAsResource(String storageKey);
 
     InputStream openStream(String storageKey);

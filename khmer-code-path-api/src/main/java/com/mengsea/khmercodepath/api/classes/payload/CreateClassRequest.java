@@ -2,6 +2,7 @@ package com.mengsea.khmercodepath.api.classes.payload;
 
 import com.mengsea.khmercodepath.commons.constant.ClassStatus;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
@@ -35,4 +36,7 @@ public class CreateClassRequest {
 
     /** Optional; defaults to ACTIVE when null. */
     private ClassStatus status;
+
+    @NotNull
+    private Long departmentId;
 }

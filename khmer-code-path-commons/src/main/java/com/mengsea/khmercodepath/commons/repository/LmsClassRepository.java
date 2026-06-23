@@ -9,7 +9,7 @@ import java.util.Optional;
 
 public interface LmsClassRepository extends JpaRepository<LmsClass, Long>, JpaSpecificationExecutor<LmsClass> {
 
-    @EntityGraph(attributePaths = "teacher")
+    @EntityGraph(attributePaths = {"teacher", "department", "department.facultyEntity"})
     Optional<LmsClass> findByIdAndDeletedFalse(Long id);
 
     boolean existsByCodeIgnoreCaseAndDeletedFalse(String code);
@@ -22,4 +22,6 @@ public interface LmsClassRepository extends JpaRepository<LmsClass, Long>, JpaSp
             String teacherUuid,
             com.mengsea.khmercodepath.commons.constant.ClassStatus status
     );
+
+    long countByDepartment_IdAndDeletedFalse(Long departmentId);
 }

@@ -1,5 +1,6 @@
 package com.mengsea.khmercodepath.api.classes.service;
 
+import com.mengsea.khmercodepath.api.departments.service.DepartmentManagementService;
 import com.mengsea.khmercodepath.api.classes.config.ClassesProperties;
 import com.mengsea.khmercodepath.api.classes.payload.AssignStudentsRequest;
 import com.mengsea.khmercodepath.api.classes.payload.ClassConfigPayload;
@@ -9,6 +10,7 @@ import com.mengsea.khmercodepath.api.classes.payload.ClassDetailPayload;
 import com.mengsea.khmercodepath.api.classes.payload.ClassPagePayload;
 import com.mengsea.khmercodepath.api.classes.payload.ClassSettingsConfigPayload;
 import com.mengsea.khmercodepath.api.classes.payload.ClassStatusOptionPayload;
+import com.mengsea.khmercodepath.api.classes.payload.ClassVisibilityOptionPayload;
 import com.mengsea.khmercodepath.api.classes.payload.ScoreComponentPayload;
 import com.mengsea.khmercodepath.api.classes.payload.ClassSummaryPayload;
 import com.mengsea.khmercodepath.api.classes.payload.CreateClassRequest;
@@ -21,12 +23,15 @@ import com.mengsea.khmercodepath.api.classes.payload.UpdateClassRequest;
 import com.mengsea.khmercodepath.api.users.mapper.UserAdminMapper;
 import com.mengsea.khmercodepath.api.users.payload.UserDetailPayload;
 import com.mengsea.khmercodepath.commons.constant.ClassStatus;
+import com.mengsea.khmercodepath.commons.constant.ClassVisibility;
 import com.mengsea.khmercodepath.commons.constant.InvitationStatus;
 import com.mengsea.khmercodepath.commons.constant.ExceptionCode;
 import com.mengsea.khmercodepath.commons.constant.Role;
 import com.mengsea.khmercodepath.commons.domain.ClassEnrollment;
 import com.mengsea.khmercodepath.commons.domain.ClassInvitation;
+import com.mengsea.khmercodepath.commons.domain.Department;
 import com.mengsea.khmercodepath.commons.domain.LmsClass;
+import com.mengsea.khmercodepath.commons.domain.School;
 import com.mengsea.khmercodepath.commons.domain.User;
 import com.mengsea.khmercodepath.commons.exception.BusinessException;
 import com.mengsea.khmercodepath.commons.repository.ClassEnrollmentRepository;
@@ -34,9 +39,11 @@ import com.mengsea.khmercodepath.commons.repository.ClassInvitationRepository;
 import com.mengsea.khmercodepath.commons.repository.LessonRepository;
 import com.mengsea.khmercodepath.commons.repository.LmsClassRepository;
 import com.mengsea.khmercodepath.commons.repository.LmsClassSpecifications;
+import com.mengsea.khmercodepath.commons.repository.SchoolRepository;
 import com.mengsea.khmercodepath.commons.repository.UserRepository;
 import com.mengsea.khmercodepath.commons.repository.UserSpecifications;
 import com.mengsea.khmercodepath.commons.security.ClassAccessHelper;
+import com.mengsea.khmercodepath.commons.security.SchoolAccessHelper;
 import com.mengsea.khmercodepath.commons.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -68,6 +75,9 @@ public class ClassManagementServiceImpl implements ClassManagementService {
     private final UserAdminMapper userAdminMapper;
     private final ClassInvitationService classInvitationService;
     private final ClassAccessHelper classAccessHelper;
+    private final SchoolAccessHelper schoolAccessHelper;
+    private final SchoolRepository schoolRepository;
+    private final DepartmentManagementService departmentManagementService;
     private final ClassesProperties classesProperties;
 
     @Override
@@ -97,6 +107,7 @@ public class ClassManagementServiceImpl implements ClassManagementService {
                         .finalExam(gw.getFinalExam())
                         .build())
                 .scoreComponents(buildScoreComponents())
+                .departmentOptions(departmentManagementService.listDepartmentOptions())
                 .build();
     }
 
@@ -106,6 +117,8 @@ public class ClassManagementServiceImpl implements ClassManagementService {
         LmsClass entity = lmsClassRepository.findByIdAndDeletedFalse(id)
                 .orElseThrow(() -> new BusinessException(ExceptionCode.CLASS_NOT_FOUND));
         classAccessHelper.assertCanManageClass(entity);
+        School school = requireSchoolForClass(entity);
+        boolean publicCoursesEnabled = school.isPublicCoursesEnabled();
         return ClassSettingsConfigPayload.builder()
                 .classId(entity.getId())
                 .className(entity.getName())
@@ -118,7 +131,38 @@ public class ClassManagementServiceImpl implements ClassManagementService {
                         ClassStatusOptionPayload.builder().value(ClassStatus.DRAFT).label("Draft").build(),
                         ClassStatusOptionPayload.builder().value(ClassStatus.ARCHIVED).label("Archived").build()
                 ))
+                .visibilityOptions(buildVisibilityOptions(publicCoursesEnabled))
+                .publicCoursesEnabled(publicCoursesEnabled)
+                .publicCoursesDisabledHint(publicCoursesEnabled
+                        ? null
+                        : classesProperties.getPublicCourses().getDisabledHint())
+                .departmentOptions(departmentManagementService.listDepartmentOptions())
                 .build();
+    }
+
+    private List<ClassVisibilityOptionPayload> buildVisibilityOptions(boolean publicCoursesEnabled) {
+        return classesProperties.getVisibilityOptions().stream()
+                .filter(o -> publicCoursesEnabled || !ClassVisibility.PUBLIC.name().equals(o.getValue()))
+                .map(o -> ClassVisibilityOptionPayload.builder()
+                        .value(ClassVisibility.valueOf(o.getValue()))
+                        .label(o.getLabel())
+                        .description(o.getDescription())
+                        .build())
+                .toList();
+    }
+
+    private School requireSchoolForClass(LmsClass entity) {
+        if (entity.getSchool() == null) {
+            throw new BusinessException(ExceptionCode.SCHOOL_NOT_ASSIGNED);
+        }
+        return schoolRepository.findById(entity.getSchool().getId())
+                .orElseThrow(() -> new BusinessException(ExceptionCode.SCHOOL_NOT_FOUND));
+    }
+
+    private void assertPublicVisibilityAllowed(School school, ClassVisibility visibility) {
+        if (visibility == ClassVisibility.PUBLIC && !school.isPublicCoursesEnabled()) {
+            throw new BusinessException(ExceptionCode.PUBLIC_COURSES_DISABLED);
+        }
     }
 
     @Override
@@ -142,8 +186,11 @@ public class ClassManagementServiceImpl implements ClassManagementService {
             spec = spec.and(LmsClassSpecifications.teacherUuidEquals(me.getUuid()));
         } else if (me.getRole() == Role.STUDENT) {
             spec = spec.and(LmsClassSpecifications.studentEnrolledEquals(me.getUuid()));
-        } else if (me.getRole() == Role.ADMIN && teacherId != null && !teacherId.isBlank()) {
-            spec = spec.and(LmsClassSpecifications.teacherUuidEquals(teacherId.trim()));
+        } else if (me.getRole() == Role.ADMIN) {
+            spec = spec.and(LmsClassSpecifications.schoolIdEquals(schoolAccessHelper.requireSchoolId(me)));
+            if (teacherId != null && !teacherId.isBlank()) {
+                spec = spec.and(LmsClassSpecifications.teacherUuidEquals(teacherId.trim()));
+            }
         }
 
         Page<LmsClass> page = lmsClassRepository.findAll(spec, pageable);
@@ -183,12 +230,16 @@ public class ClassManagementServiceImpl implements ClassManagementService {
         if (me.getRole() == Role.TEACHER) {
             teacherUuid = me.getUuid();
         }
-        User teacher = requireTeacherUser(teacherUuid);
+        User teacher = requireTeacherUser(teacherUuid, me);
+        School school = teacher.getSchool() != null ? teacher.getSchool() : schoolAccessHelper.requireSchool(me);
+        Department department = departmentManagementService.requireDepartmentForSchool(request.getDepartmentId(), school);
         LmsClass entity = new LmsClass();
         entity.setCode(code);
         entity.setName(request.getName().trim());
         entity.setDescription(blankToNull(request.getDescription()));
         entity.setTeacher(teacher);
+        entity.setSchool(school);
+        entity.setDepartment(department);
         entity.setSemester(blankToNull(request.getSemester()));
         entity.setAcademicYear(request.getAcademicYear());
         entity.setSchedule(blankToNull(request.getSchedule()));
@@ -226,7 +277,7 @@ public class ClassManagementServiceImpl implements ClassManagementService {
             if (me.getRole() == Role.TEACHER) {
                 throw new BusinessException(ExceptionCode.ACCESS_DENIED);
             }
-            entity.setTeacher(requireTeacherUser(request.getTeacherId().trim()));
+            entity.setTeacher(requireTeacherUser(request.getTeacherId().trim(), me));
         }
         if (request.getSemester() != null) {
             entity.setSemester(blankToNull(request.getSemester()));
@@ -242,6 +293,17 @@ public class ClassManagementServiceImpl implements ClassManagementService {
         }
         if (request.getStatus() != null) {
             entity.setStatus(request.getStatus());
+        }
+        if (request.getVisibility() != null) {
+            School school = requireSchoolForClass(entity);
+            assertPublicVisibilityAllowed(school, request.getVisibility());
+            entity.setVisibility(request.getVisibility());
+        }
+        if (request.getDepartmentId() != null) {
+            School school = entity.getSchool() != null
+                    ? requireSchoolForClass(entity)
+                    : schoolAccessHelper.requireSchool(me);
+            entity.setDepartment(departmentManagementService.requireDepartmentForSchool(request.getDepartmentId(), school));
         }
         if (request.getGradingWeights() != null) {
             applyGradingWeights(entity, request.getGradingWeights());
@@ -339,6 +401,7 @@ public class ClassManagementServiceImpl implements ClassManagementService {
     private void assertCanRead(LmsClass entity) {
         User me = SecurityUtils.requireCurrentUser();
         if (me.getRole() == Role.ADMIN) {
+            schoolAccessHelper.assertSameSchool(me, entity);
             return;
         }
         if (me.getRole() == Role.TEACHER && Objects.equals(me.getUuid(), entity.getTeacher().getUuid())) {
@@ -351,11 +414,14 @@ public class ClassManagementServiceImpl implements ClassManagementService {
         throw new BusinessException(ExceptionCode.ACCESS_DENIED);
     }
 
-    private User requireTeacherUser(String uuid) {
+    private User requireTeacherUser(String uuid, User actor) {
         User u = userRepository.findByUuidAndDeletedFalse(uuid)
                 .orElseThrow(() -> new BusinessException(ExceptionCode.TEACHER_NOT_FOUND));
         if (u.getRole() != Role.TEACHER) {
             throw new BusinessException(ExceptionCode.TEACHER_NOT_FOUND);
+        }
+        if (actor.getRole() == Role.ADMIN) {
+            schoolAccessHelper.assertSameSchool(actor, u);
         }
         return u;
     }
@@ -394,6 +460,8 @@ public class ClassManagementServiceImpl implements ClassManagementService {
                 .semesterLabel(formatSemesterLabel(c.getSemester(), c.getAcademicYear()))
                 .status(c.getStatus())
                 .statusLabel(formatStatusLabel(c.getStatus()))
+                .visibility(c.getVisibility())
+                .visibilityLabel(formatVisibilityLabel(c.getVisibility()))
                 .cardGradient(gradient)
                 .enrolledCount(enrolled)
                 .createdAt(c.getCreatedAt())
@@ -471,6 +539,13 @@ public class ClassManagementServiceImpl implements ClassManagementService {
         };
     }
 
+    private static String formatVisibilityLabel(ClassVisibility visibility) {
+        if (visibility == null || visibility == ClassVisibility.PRIVATE) {
+            return "Private";
+        }
+        return "Public";
+    }
+
     private ClassDetailPayload toDetail(LmsClass c) {
         long enrolled = classEnrollmentRepository.countByLmsClass_Id(c.getId());
         long lessonTotal = lessonRepository.countByLmsClass_IdAndDeletedFalse(c.getId());
@@ -485,9 +560,16 @@ public class ClassManagementServiceImpl implements ClassManagementService {
                 .schedule(c.getSchedule())
                 .roomNumber(c.getRoomNumber())
                 .status(c.getStatus())
+                .visibility(c.getVisibility())
+                .visibilityLabel(formatVisibilityLabel(c.getVisibility()))
                 .enrollment(EnrollmentCountsPayload.builder().enrolled(enrolled).build())
                 .lessons(LessonsSummaryPayload.builder().total(lessonTotal).build())
                 .gradingWeights(toGradingWeights(c))
+                .departmentId(c.getDepartment() != null ? c.getDepartment().getId() : null)
+                .departmentName(c.getDepartment() != null ? c.getDepartment().getName() : null)
+                .facultyName(c.getDepartment() != null && c.getDepartment().getFacultyEntity() != null
+                        ? c.getDepartment().getFacultyEntity().getName()
+                        : null)
                 .createdAt(c.getCreatedAt())
                 .updatedAt(c.getUpdatedAt())
                 .build();

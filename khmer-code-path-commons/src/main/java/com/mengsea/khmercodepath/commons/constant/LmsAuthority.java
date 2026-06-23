@@ -33,6 +33,9 @@ public final class LmsAuthority {
     /** DEPT / OPS — School operations (admin only). */
     public static final String OPS_MANAGE = "lms:ops:manage";
 
+    /** SCH — Manage school profile and members within the tenant (school admin). */
+    public static final String SCHOOL_MANAGE = "lms:school:manage";
+
     /** ATT — Record / update attendance (teacher + admin). */
     public static final String ATT_MANAGE = "lms:att:manage";
 

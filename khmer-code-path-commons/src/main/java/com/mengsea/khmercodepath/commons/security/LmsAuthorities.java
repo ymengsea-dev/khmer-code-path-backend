@@ -31,6 +31,7 @@ public final class LmsAuthorities {
                 authorities.add(new SimpleGrantedAuthority(LmsAuthority.CRS_READ));
                 authorities.add(new SimpleGrantedAuthority(LmsAuthority.CRS_MANAGE));
                 authorities.add(new SimpleGrantedAuthority(LmsAuthority.OPS_MANAGE));
+                authorities.add(new SimpleGrantedAuthority(LmsAuthority.SCHOOL_MANAGE));
                 authorities.add(new SimpleGrantedAuthority(LmsAuthority.AI_CHAT));
                 authorities.add(new SimpleGrantedAuthority(LmsAuthority.AI_INGEST));
                 authorities.add(new SimpleGrantedAuthority(LmsAuthority.DASH_READ));

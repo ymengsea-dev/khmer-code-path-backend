@@ -1,6 +1,7 @@
 package com.mengsea.khmercodepath.api.classes.payload;
 
 import com.mengsea.khmercodepath.commons.constant.ClassStatus;
+import com.mengsea.khmercodepath.commons.constant.ClassVisibility;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
@@ -30,6 +31,10 @@ public class UpdateClassRequest {
     private String roomNumber;
 
     private ClassStatus status;
+
+    private ClassVisibility visibility;
+
+    private Long departmentId;
 
     private GradingWeightsPayload gradingWeights;
 }

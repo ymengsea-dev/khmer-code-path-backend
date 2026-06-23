@@ -19,6 +19,30 @@ public class ClassesProperties {
     private GradingWeights gradingWeights = new GradingWeights();
     private List<SettingsTabEntry> settingsTabs = defaultSettingsTabs();
     private List<ScoreComponentEntry> scoreComponents = defaultScoreComponents();
+    private List<VisibilityOptionEntry> visibilityOptions = defaultVisibilityOptions();
+    private PublicCourses publicCourses = new PublicCourses();
+
+    @Getter
+    @Setter
+    public static class VisibilityOptionEntry {
+        private String value;
+        private String label;
+        private String description;
+    }
+
+    @Getter
+    @Setter
+    public static class PublicCourses {
+        private String pageTitle = "Public Courses";
+        private String pageDescription = "Browse open classes at your school and join instantly.";
+        private String navLabel = "Public Courses";
+        private String emptyMessage = "No public courses are available right now.";
+        private String enrollButtonLabel = "Join class";
+        private String enrolledLabel = "Enrolled";
+        private String searchPlaceholder = "Search public courses…";
+        private String disabledHint =
+                "Your school administrator has not enabled public courses. Only private (invite-only) classes are available.";
+    }
 
     @Getter
     @Setter
@@ -118,6 +142,23 @@ public class ClassesProperties {
         e.setKey(key);
         e.setLabel(label);
         e.setColor(color);
+        return e;
+    }
+
+    private static List<VisibilityOptionEntry> defaultVisibilityOptions() {
+        List<VisibilityOptionEntry> items = new ArrayList<>();
+        items.add(visibilityOption("PRIVATE", "Private (invite only)",
+                "Students can join only after you invite them."));
+        items.add(visibilityOption("PUBLIC", "Public (self-enroll)",
+                "Students at your school can discover and join this class from Public Courses."));
+        return items;
+    }
+
+    private static VisibilityOptionEntry visibilityOption(String value, String label, String description) {
+        VisibilityOptionEntry e = new VisibilityOptionEntry();
+        e.setValue(value);
+        e.setLabel(label);
+        e.setDescription(description);
         return e;
     }
 }

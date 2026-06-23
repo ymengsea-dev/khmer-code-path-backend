@@ -25,4 +25,8 @@ public class RegisterRequest {
     @Size(min = 4, max = 16)
     @Schema(description = "your password", example = "Pass123", minLength = 4, maxLength = 16)
     private String password;
+
+    @NotBlank(message = "School slug is required")
+    @Schema(description = "School registration slug", example = "default")
+    private String schoolSlug;
 }

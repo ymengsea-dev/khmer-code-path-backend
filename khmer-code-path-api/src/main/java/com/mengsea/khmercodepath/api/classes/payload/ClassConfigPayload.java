@@ -15,4 +15,5 @@ public class ClassConfigPayload {
     private ClassCreateDefaultsPayload createDefaults;
     private GradingWeightsPayload gradingWeights;
     private List<ScoreComponentPayload> scoreComponents;
+    private List<com.mengsea.khmercodepath.api.departments.payload.DepartmentOptionPayload> departmentOptions;
 }

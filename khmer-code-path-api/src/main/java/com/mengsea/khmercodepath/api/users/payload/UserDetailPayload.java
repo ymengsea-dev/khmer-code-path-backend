@@ -26,4 +26,6 @@ public class UserDetailPayload {
     private boolean deleted;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private Long schoolId;
+    private String schoolName;
 }

@@ -16,6 +16,8 @@ public class UserMapper {
                 .isActive(user.isActive())
                 .bio(user.getBio())
                 .avatarUrl(resolveAvatarUrl(user))
+                .schoolId(user.getSchool() != null ? user.getSchool().getId() : null)
+                .schoolName(user.getSchool() != null ? user.getSchool().getName() : null)
                 .build();
     }
 

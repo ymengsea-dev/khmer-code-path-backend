@@ -31,6 +31,7 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.io.IOException;
@@ -47,7 +48,12 @@ public class AuthController {
     @Operation(summary = "Register User")
     @PostMapping("/register")
     public ResponseEntity<ApiResponse<Void>> register(@Valid @RequestBody RegisterRequest registerRequest) {
-        userService.register(registerRequest.getUsername(), registerRequest.getEmail(), registerRequest.getPassword());
+        userService.register(
+                registerRequest.getUsername(),
+                registerRequest.getEmail(),
+                registerRequest.getPassword(),
+                registerRequest.getSchoolSlug()
+        );
         ApiResponse<Void> body = ApiResponses.of("AUTH-0090", LmsStatusCode.CREATED, null, null);
         return ResponseEntity.status(HttpStatus.CREATED).body(body);
     }
@@ -148,7 +154,19 @@ public class AuthController {
 
     @Operation(summary = "Login with google")
     @GetMapping("/google")
-    public void redirectToGoogle(HttpServletResponse response) throws IOException {
+    public void redirectToGoogle(
+            @RequestParam(required = false) String schoolSlug,
+            HttpServletRequest request,
+            HttpServletResponse response
+    ) throws IOException {
+        if (schoolSlug != null && !schoolSlug.isBlank()) {
+            Cookie cookie = new Cookie("registration_school_slug", schoolSlug.trim().toLowerCase());
+            cookie.setPath("/");
+            cookie.setMaxAge(600);
+            cookie.setHttpOnly(true);
+            cookie.setSecure(false);
+            response.addCookie(cookie);
+        }
         response.sendRedirect("/oauth2/authorization/google");
     }
 

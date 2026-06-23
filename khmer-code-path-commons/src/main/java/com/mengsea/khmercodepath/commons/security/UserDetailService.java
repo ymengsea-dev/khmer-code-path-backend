@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserDetailService implements UserDetailsService {
 
     private final UserRepository userRepository;
+    private final UserPermissionResolver userPermissionResolver;
 
     @Override
     @Transactional(readOnly = true)
@@ -22,6 +23,6 @@ public class UserDetailService implements UserDetailsService {
         User user = userRepository.findByEmailAndDeletedFalse(email)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with this email: " + email));
 
-        return new CustomUserDetail(user);
+        return new CustomUserDetail(user, userPermissionResolver.resolve(user));
     }
 }

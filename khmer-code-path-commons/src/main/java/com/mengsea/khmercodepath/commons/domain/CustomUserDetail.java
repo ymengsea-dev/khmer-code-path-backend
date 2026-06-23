@@ -1,16 +1,25 @@
 package com.mengsea.khmercodepath.commons.domain;
 
 import com.mengsea.khmercodepath.commons.security.LmsAuthorities;
-import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import java.util.Collection;
 
-@RequiredArgsConstructor
+
 public class CustomUserDetail implements UserDetails {
 
     private final User user;
+    private final Collection<? extends GrantedAuthority> authorities;
+
+    public CustomUserDetail(User user) {
+        this(user, LmsAuthorities.forUser(user));
+    }
+
+    public CustomUserDetail(User user, Collection<? extends GrantedAuthority> authorities) {
+        this.user = user;
+        this.authorities = authorities;
+    }
 
     public User getUser() {
         return user;
@@ -18,7 +27,7 @@ public class CustomUserDetail implements UserDetails {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return LmsAuthorities.forUser(user);
+        return authorities;
     }
 
     @Override

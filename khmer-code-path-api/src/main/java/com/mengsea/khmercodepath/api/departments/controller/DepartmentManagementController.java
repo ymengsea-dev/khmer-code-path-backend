@@ -2,6 +2,7 @@ package com.mengsea.khmercodepath.api.departments.controller;
 
 import com.mengsea.khmercodepath.api.departments.payload.CreateDepartmentRequest;
 import com.mengsea.khmercodepath.api.departments.payload.DepartmentDetailPayload;
+import com.mengsea.khmercodepath.api.departments.payload.DepartmentOptionPayload;
 import com.mengsea.khmercodepath.api.departments.payload.DepartmentSummaryPayload;
 import com.mengsea.khmercodepath.api.departments.payload.UpdateDepartmentRequest;
 import com.mengsea.khmercodepath.api.departments.service.DepartmentManagementService;
@@ -31,22 +32,31 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/departments")
 @RequiredArgsConstructor
-@Tag(name = "Department Management", description = "DEPT — academic departments (admin)")
+@Tag(name = "Department Management", description = "DEPT — school departments (admin / teachers)")
 @SecurityRequirement(name = SwaggerConfig.SECURITY_SCHEME_NAME)
-@PreAuthorize("hasAuthority('" + LmsAuthority.OPS_MANAGE + "')")
 public class DepartmentManagementController {
 
     private final DepartmentManagementService departmentManagementService;
 
-    @Operation(summary = "DEPT-1700 · List departments")
+    @Operation(summary = "DEPT-1700 · List departments at my school")
     @GetMapping
+    @PreAuthorize("hasAnyAuthority('" + LmsAuthority.SCHOOL_MANAGE + "','" + LmsAuthority.CLS_MANAGE + "')")
     public ResponseEntity<ApiResponse<List<DepartmentSummaryPayload>>> listDepartments() {
         List<DepartmentSummaryPayload> data = departmentManagementService.listDepartments();
         return ResponseEntity.ok(ApiResponses.of("DEPT-1700", LmsStatusCode.SUCCESS, null, data));
     }
 
+    @Operation(summary = "DEPT-1705 · List department options for class forms")
+    @GetMapping("/options")
+    @PreAuthorize("hasAnyAuthority('" + LmsAuthority.SCHOOL_MANAGE + "','" + LmsAuthority.CLS_MANAGE + "')")
+    public ResponseEntity<ApiResponse<List<DepartmentOptionPayload>>> listDepartmentOptions() {
+        List<DepartmentOptionPayload> data = departmentManagementService.listDepartmentOptions();
+        return ResponseEntity.ok(ApiResponses.of("DEPT-1705", LmsStatusCode.SUCCESS, null, data));
+    }
+
     @Operation(summary = "DEPT-1720 · Get department details")
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('" + LmsAuthority.SCHOOL_MANAGE + "')")
     public ResponseEntity<ApiResponse<DepartmentDetailPayload>> getDepartment(@PathVariable Long id) {
         DepartmentDetailPayload data = departmentManagementService.getDepartment(id);
         return ResponseEntity.ok(ApiResponses.of("DEPT-1720", LmsStatusCode.SUCCESS, null, data));
@@ -54,6 +64,7 @@ public class DepartmentManagementController {
 
     @Operation(summary = "DEPT-1710 · Create department")
     @PostMapping
+    @PreAuthorize("hasAuthority('" + LmsAuthority.SCHOOL_MANAGE + "')")
     public ResponseEntity<ApiResponse<DepartmentSummaryPayload>> createDepartment(
             @Valid @RequestBody CreateDepartmentRequest request
     ) {
@@ -64,6 +75,7 @@ public class DepartmentManagementController {
 
     @Operation(summary = "DEPT-1730 · Update department")
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('" + LmsAuthority.SCHOOL_MANAGE + "')")
     public ResponseEntity<ApiResponse<DepartmentSummaryPayload>> updateDepartment(
             @PathVariable Long id,
             @Valid @RequestBody UpdateDepartmentRequest request

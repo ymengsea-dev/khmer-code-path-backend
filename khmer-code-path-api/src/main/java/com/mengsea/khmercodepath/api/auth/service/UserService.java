@@ -4,7 +4,7 @@ import com.mengsea.khmercodepath.api.auth.payload.AuthResponse;
 import com.mengsea.khmercodepath.api.auth.payload.UserResponse;
 
 public interface UserService {
-    void register(String username, String email, String password);
+    void register(String username, String email, String password, String schoolSlug);
 
     AuthResponse login(String email, String password);
 

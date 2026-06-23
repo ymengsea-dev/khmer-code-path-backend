@@ -90,6 +90,41 @@ public class MinioUploadStorage implements UploadStorage {
         return new StoredFile(key, safeName, file.getContentType(), size >= 0 ? size : file.getSize());
     }
 
+    @Override
+    public StoredFile storeSchoolCover(Long schoolId, MultipartFile file) {
+        return storeCoverImage("school-covers/" + schoolId, file, "school cover");
+    }
+
+    @Override
+    public StoredFile storeFacultyCover(Long facultyId, MultipartFile file) {
+        return storeCoverImage("faculty-covers/" + facultyId, file, "faculty cover");
+    }
+
+    private StoredFile storeCoverImage(String keyPrefix, MultipartFile file, String logLabel) {
+        SchoolCoverUploadValidator.validateFile(file);
+        ensureBucketExists();
+        String safeName = SchoolCoverUploadValidator.sanitizeFileName(file.getOriginalFilename());
+        String key = keyPrefix + "/" + UUID.randomUUID() + "_" + safeName;
+        long size = resolveObjectSize(file);
+        try (InputStream in = file.getInputStream()) {
+            minioClient.putObject(
+                    PutObjectArgs.builder()
+                            .bucket(minioProperties.getBucketName())
+                            .object(key)
+                            .stream(in, size, size < 0 ? MIN_PART_SIZE_BYTES : -1)
+                            .contentType(file.getContentType())
+                            .build()
+            );
+        } catch (BusinessException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            log.error("MinIO {} upload failed for object {} in bucket {}", logLabel, key,
+                    minioProperties.getBucketName(), ex);
+            throw new BusinessException(ExceptionCode.FILE_STORAGE_FAILED);
+        }
+        return new StoredFile(key, safeName, file.getContentType(), size >= 0 ? size : file.getSize());
+    }
+
     private void ensureBucketExists() {
         String bucket = minioProperties.getBucketName();
         try {

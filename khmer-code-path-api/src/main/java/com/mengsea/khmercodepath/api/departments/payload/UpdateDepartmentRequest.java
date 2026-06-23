@@ -13,16 +13,12 @@ public class UpdateDepartmentRequest {
     @Size(max = 255)
     private String name;
 
-    @Size(max = 255)
-    private String faculty;
+    private Long facultyId;
 
     @Size(max = 255)
     private String headOfDept;
 
     private String hodId;
-
-    @Min(0)
-    private Integer facultyCount;
 
     @Min(0)
     @Max(100)

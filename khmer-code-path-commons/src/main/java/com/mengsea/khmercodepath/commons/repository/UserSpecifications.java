@@ -48,4 +48,11 @@ public final class UserSpecifications {
         }
         return (root, query, cb) -> cb.equal(root.get("isActive"), isActive);
     }
+
+    public static Specification<User> schoolIdEquals(Long schoolId) {
+        if (schoolId == null) {
+            return (root, query, cb) -> cb.conjunction();
+        }
+        return (root, query, cb) -> cb.equal(root.join("school").get("id"), schoolId);
+    }
 }

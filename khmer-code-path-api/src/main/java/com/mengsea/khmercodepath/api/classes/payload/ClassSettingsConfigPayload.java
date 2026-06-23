@@ -13,4 +13,8 @@ public class ClassSettingsConfigPayload {
     private List<LessonTabPayload> tabs;
     private List<ScoreComponentPayload> scoreComponents;
     private List<ClassStatusOptionPayload> statusOptions;
+    private List<ClassVisibilityOptionPayload> visibilityOptions;
+    private boolean publicCoursesEnabled;
+    private String publicCoursesDisabledHint;
+    private List<com.mengsea.khmercodepath.api.departments.payload.DepartmentOptionPayload> departmentOptions;
 }

@@ -11,7 +11,10 @@ import com.mengsea.khmercodepath.api.classes.payload.CreateClassCommentRequest;
 import com.mengsea.khmercodepath.api.classes.payload.CreateClassRequest;
 import com.mengsea.khmercodepath.api.classes.payload.RemoveStudentsRequest;
 import com.mengsea.khmercodepath.api.classes.payload.UpdateClassRequest;
+import com.mengsea.khmercodepath.api.classes.payload.PublicCoursesConfigPayload;
+import com.mengsea.khmercodepath.api.classes.payload.PublicCoursesPagePayload;
 import com.mengsea.khmercodepath.api.classes.service.ClassCommentService;
+import com.mengsea.khmercodepath.api.classes.service.PublicCoursesService;
 import com.mengsea.khmercodepath.api.classes.service.ClassInvitationService;
 import com.mengsea.khmercodepath.api.classes.service.ClassManagementService;
 import com.mengsea.khmercodepath.api.users.payload.UserDetailPayload;
@@ -46,6 +49,35 @@ public class ClassManagementController {
     private final ClassManagementService classManagementService;
     private final ClassCommentService classCommentService;
     private final ClassInvitationService classInvitationService;
+    private final PublicCoursesService publicCoursesService;
+
+    @Operation(summary = "CLS-0280 · Public courses page config")
+    @GetMapping("/public/config")
+    @PreAuthorize("hasRole('STUDENT')")
+    public ResponseEntity<ApiResponse<PublicCoursesConfigPayload>> getPublicCoursesConfig() {
+        PublicCoursesConfigPayload data = publicCoursesService.getConfig();
+        return ResponseEntity.ok(ApiResponses.of("CLS-0280", LmsStatusCode.SUCCESS, null, data));
+    }
+
+    @Operation(summary = "CLS-0285 · List public courses at my school")
+    @GetMapping("/public")
+    @PreAuthorize("hasRole('STUDENT')")
+    public ResponseEntity<ApiResponse<PublicCoursesPagePayload>> listPublicCourses(
+            @RequestParam(required = false) String search,
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
+    ) {
+        PublicCoursesPagePayload data = publicCoursesService.listPublicCourses(search, pageable);
+        return ResponseEntity.ok(ApiResponses.of("CLS-0285", LmsStatusCode.SUCCESS, null, data));
+    }
+
+    @Operation(summary = "CLS-0288 · Self-enroll in a public class")
+    @PostMapping("/{id}/self-enroll")
+    @PreAuthorize("hasRole('STUDENT')")
+    public ResponseEntity<ApiResponse<Void>> selfEnroll(@PathVariable Long id) {
+        publicCoursesService.selfEnroll(id);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponses.of("CLS-0288", LmsStatusCode.CREATED, null, null));
+    }
 
     @Operation(summary = "CLS-0295 · Classes UI config (tabs, semester filters, gradients)")
     @GetMapping("/config")

@@ -1,11 +1,10 @@
 package com.mengsea.khmercodepath.api.auth.service;
 
+import com.mengsea.khmercodepath.api.schools.service.SchoolRegistrationService;
 import com.mengsea.khmercodepath.api.auth.mapper.UserMapper;
 import com.mengsea.khmercodepath.api.auth.payload.AuthResponse;
 import com.mengsea.khmercodepath.api.auth.payload.UserResponse;
 import com.mengsea.khmercodepath.commons.constant.ExceptionCode;
-import com.mengsea.khmercodepath.commons.constant.Provider;
-import com.mengsea.khmercodepath.commons.constant.Role;
 import com.mengsea.khmercodepath.commons.domain.CustomUserDetail;
 import com.mengsea.khmercodepath.commons.domain.PasswordResetToken;
 import com.mengsea.khmercodepath.commons.domain.User;
@@ -13,6 +12,7 @@ import com.mengsea.khmercodepath.commons.exception.BusinessException;
 import com.mengsea.khmercodepath.commons.repository.PasswordResetTokenRepository;
 import com.mengsea.khmercodepath.commons.repository.UserRepository;
 import com.mengsea.khmercodepath.commons.security.JwtService;
+import com.mengsea.khmercodepath.commons.security.UserPermissionResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -39,6 +39,8 @@ public class UserServiceImpl implements UserService {
     private final UserMapper userMapper;
     private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final PasswordResetMailer passwordResetMailer;
+    private final SchoolRegistrationService schoolRegistrationService;
+    private final UserPermissionResolver userPermissionResolver;
 
     /** Explicitly revoked refresh tokens (logout). Valid JWTs refresh even if not in {@link #refreshTokenStore}. */
     private final Set<String> revokedRefreshTokens = ConcurrentHashMap.newKeySet();
@@ -46,18 +48,8 @@ public class UserServiceImpl implements UserService {
     private final SecureRandom secureRandom = new SecureRandom();
 
     @Override
-    public void register(String username, String email, String password) {
-        if (userRepository.findByEmail(email).isPresent()) {
-            throw new BusinessException(ExceptionCode.USER_ALREADY_EXISTS);
-        }
-        User user = new User();
-        user.setUsername(username);
-        user.setEmail(email);
-        user.setPassword(passwordEncoder.encode(password));
-        user.setProvider(Provider.LOCAL);
-        user.setRole(Role.STUDENT);
-        user.setDeleted(false);
-        userRepository.save(user);
+    public void register(String username, String email, String password, String schoolSlug) {
+        schoolRegistrationService.registerStudent(schoolSlug, username, email, password);
     }
 
     @Override
@@ -110,7 +102,7 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findByEmailAndDeletedFalse(email)
                 .orElseThrow(() -> new BusinessException(ExceptionCode.USER_NOT_FOUND));
 
-        CustomUserDetail userDetails = new CustomUserDetail(user);
+        CustomUserDetail userDetails = new CustomUserDetail(user, userPermissionResolver.resolve(user));
         if (!jwtService.isTokenValid(refreshToken, userDetails)) {
             throw new BusinessException(ExceptionCode.REFRESH_TOKEN_REVOKED);
         }

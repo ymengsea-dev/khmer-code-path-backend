@@ -20,6 +20,7 @@ public class ClassAccessHelper {
     private final LmsClassRepository lmsClassRepository;
     private final ClassEnrollmentRepository classEnrollmentRepository;
     private final UserRepository userRepository;
+    private final SchoolAccessHelper schoolAccessHelper;
 
     public LmsClass requireReadableClass(Long classId) {
         LmsClass entity = lmsClassRepository.findByIdAndDeletedFalse(classId)
@@ -31,6 +32,7 @@ public class ClassAccessHelper {
     public void assertCanRead(LmsClass entity) {
         User me = SecurityUtils.requireCurrentUser();
         if (me.getRole() == Role.ADMIN) {
+            schoolAccessHelper.assertSameSchool(me, entity);
             return;
         }
         if (me.getRole() == Role.TEACHER
@@ -54,7 +56,7 @@ public class ClassAccessHelper {
     public boolean canManageClass(LmsClass entity) {
         User me = SecurityUtils.requireCurrentUser();
         if (me.getRole() == Role.ADMIN) {
-            return true;
+            return schoolAccessHelper.isSameSchool(me, entity);
         }
         return me.getRole() == Role.TEACHER
                 && Objects.equals(me.getUuid(), entity.getTeacher().getUuid());
@@ -71,7 +73,10 @@ public class ClassAccessHelper {
 
     public void assertCanViewStudentProgress(String studentUuid) {
         User me = SecurityUtils.requireCurrentUser();
+        User student = userRepository.findByUuidAndDeletedFalse(studentUuid)
+                .orElseThrow(() -> new BusinessException(ExceptionCode.STUDENT_NOT_FOUND));
         if (me.getRole() == Role.ADMIN) {
+            schoolAccessHelper.assertSameSchool(me, student);
             return;
         }
         if (me.getRole() == Role.STUDENT && Objects.equals(me.getUuid(), studentUuid)) {

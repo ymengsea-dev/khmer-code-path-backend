@@ -29,6 +29,7 @@ import com.mengsea.khmercodepath.commons.repository.LmsClassRepository;
 import com.mengsea.khmercodepath.commons.repository.LmsClassSpecifications;
 import com.mengsea.khmercodepath.commons.repository.UserRepository;
 import com.mengsea.khmercodepath.commons.repository.UserSpecifications;
+import com.mengsea.khmercodepath.commons.security.SchoolAccessHelper;
 import com.mengsea.khmercodepath.commons.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.csv.CSVFormat;
@@ -70,6 +71,7 @@ public class UserManagementServiceImpl implements UserManagementService {
     private final UserAdminMapper userAdminMapper;
     private final LmsClassRepository lmsClassRepository;
     private final ClassEnrollmentRepository classEnrollmentRepository;
+    private final SchoolAccessHelper schoolAccessHelper;
 
     private static final List<StatusFilterPayload> STATUS_FILTERS = List.of(
             StatusFilterPayload.builder().value("all").label("All Status").build(),
@@ -81,8 +83,7 @@ public class UserManagementServiceImpl implements UserManagementService {
             UserTabPayload.builder().id("all").label("All Users").build(),
             UserTabPayload.builder().id("students").label("Students").build(),
             UserTabPayload.builder().id("teachers").label("Teachers").build(),
-            UserTabPayload.builder().id("admins").label("Administrators").build(),
-            UserTabPayload.builder().id("permissions").label("Roles & Permissions").build()
+            UserTabPayload.builder().id("admins").label("Administrators").build()
     );
 
     private static final List<String> CARD_GRADIENTS = List.of(
@@ -104,7 +105,7 @@ public class UserManagementServiceImpl implements UserManagementService {
         if (isAdmin) {
             return UserManagementConfigPayload.builder()
                     .pageTitle("Student Management")
-                    .pageDescription("Manage students, teachers, and institution-wide access control.")
+                    .pageDescription("Manage students, teachers, and administrators at your school.")
                     .tabs(ADMIN_TABS)
                     .statusFilters(STATUS_FILTERS)
                     .classFilters(classFilters)
@@ -163,7 +164,8 @@ public class UserManagementServiceImpl implements UserManagementService {
         if (me.getRole() == Role.ADMIN && classId == null) {
             Specification<User> spec = Specification.where(UserSpecifications.deletedFlag(false))
                     .and(UserSpecifications.roleEquals(Role.STUDENT))
-                    .and(UserSpecifications.activeEquals(isActive));
+                    .and(UserSpecifications.activeEquals(isActive))
+                    .and(UserSpecifications.schoolIdEquals(schoolAccessHelper.requireSchoolId(me)));
             for (User student : userRepository.findAll(spec)) {
                 students.computeIfAbsent(student.getUuid(), id -> StudentAccumulator.from(student));
             }
@@ -194,6 +196,10 @@ public class UserManagementServiceImpl implements UserManagementService {
                 .orElseThrow(() -> new BusinessException(ExceptionCode.USER_NOT_FOUND));
         if (student.getRole() != Role.STUDENT) {
             throw new BusinessException(ExceptionCode.STUDENT_NOT_FOUND);
+        }
+
+        if (me.getRole() == Role.ADMIN) {
+            schoolAccessHelper.assertSameSchool(me, student);
         }
 
         if (me.getRole() == Role.TEACHER
@@ -257,6 +263,8 @@ public class UserManagementServiceImpl implements UserManagementService {
                 .and(LmsClassSpecifications.statusEquals(ClassStatus.ACTIVE));
         if (me.getRole() == Role.TEACHER) {
             spec = spec.and(LmsClassSpecifications.teacherUuidEquals(me.getUuid()));
+        } else if (me.getRole() == Role.ADMIN) {
+            spec = spec.and(LmsClassSpecifications.schoolIdEquals(schoolAccessHelper.requireSchoolId(me)));
         }
         if (classId != null) {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("id"), classId));
@@ -341,11 +349,15 @@ public class UserManagementServiceImpl implements UserManagementService {
     @Override
     @Transactional(readOnly = true)
     public UserPagePayload listUsers(String name, String email, Role role, Boolean isActive, boolean includeDeleted, Pageable pageable) {
+        User me = SecurityUtils.requireCurrentUser();
         Specification<User> spec = Specification.where(UserSpecifications.deletedFlag(includeDeleted))
                 .and(UserSpecifications.nameContains(name))
                 .and(UserSpecifications.emailContains(email))
                 .and(UserSpecifications.roleEquals(role))
                 .and(UserSpecifications.activeEquals(isActive));
+        if (me.getRole() == Role.ADMIN) {
+            spec = spec.and(UserSpecifications.schoolIdEquals(schoolAccessHelper.requireSchoolId(me)));
+        }
 
         Page<User> page = userRepository.findAll(spec, pageable);
         List<UserDetailPayload> items = page.getContent().stream().map(userAdminMapper::toDetail).toList();
@@ -361,14 +373,19 @@ public class UserManagementServiceImpl implements UserManagementService {
     @Override
     @Transactional(readOnly = true)
     public UserDetailPayload getUser(String id) {
+        User me = SecurityUtils.requireCurrentUser();
         User user = userRepository.findByUuidAndDeletedFalse(id)
                 .orElseThrow(() -> new BusinessException(ExceptionCode.USER_NOT_FOUND));
+        if (me.getRole() == Role.ADMIN) {
+            schoolAccessHelper.assertSameSchool(me, user);
+        }
         return userAdminMapper.toDetail(user);
     }
 
     @Override
     @Transactional
     public UserDetailPayload createUser(CreateUserRequest request) {
+        User me = SecurityUtils.requireCurrentUser();
         String email = request.getEmail().trim().toLowerCase(Locale.ROOT);
         assertEmailAvailable(email);
         String studentId = blankToNull(request.getStudentId());
@@ -383,6 +400,9 @@ public class UserManagementServiceImpl implements UserManagementService {
                 studentId,
                 teacherId
         );
+        if (me.getRole() == Role.ADMIN) {
+            user.setSchool(schoolAccessHelper.requireSchool(me));
+        }
         userRepository.save(user);
         return userAdminMapper.toDetail(user);
     }
@@ -390,8 +410,12 @@ public class UserManagementServiceImpl implements UserManagementService {
     @Override
     @Transactional
     public UserDetailPayload updateUser(String id, UpdateUserRequest request) {
+        User me = SecurityUtils.requireCurrentUser();
         User user = userRepository.findByUuidAndDeletedFalse(id)
                 .orElseThrow(() -> new BusinessException(ExceptionCode.USER_NOT_FOUND));
+        if (me.getRole() == Role.ADMIN) {
+            schoolAccessHelper.assertSameSchool(me, user);
+        }
 
         if (request.getName() != null && !request.getName().isBlank()) {
             user.setUsername(request.getName().trim());
@@ -407,7 +431,8 @@ public class UserManagementServiceImpl implements UserManagementService {
         if (request.getPassword() != null && !request.getPassword().isBlank()) {
             user.setPassword(passwordEncoder.encode(request.getPassword()));
         }
-        if (request.getRole() != null) {
+        if (request.getRole() != null && request.getRole() != user.getRole()) {
+            assertRoleChangeAllowed(me, user, request.getRole());
             user.setRole(request.getRole());
         }
 
@@ -444,8 +469,12 @@ public class UserManagementServiceImpl implements UserManagementService {
     @Override
     @Transactional
     public void deleteUser(String id) {
+        User me = SecurityUtils.requireCurrentUser();
         User user = userRepository.findByUuidAndDeletedFalse(id)
                 .orElseThrow(() -> new BusinessException(ExceptionCode.USER_NOT_FOUND));
+        if (me.getRole() == Role.ADMIN) {
+            schoolAccessHelper.assertSameSchool(me, user);
+        }
         user.setDeleted(true);
         user.setActive(false);
         userRepository.save(user);
@@ -454,8 +483,12 @@ public class UserManagementServiceImpl implements UserManagementService {
     @Override
     @Transactional
     public UserDetailPayload updateStatus(String id, UserStatusRequest request) {
+        User me = SecurityUtils.requireCurrentUser();
         User user = userRepository.findByUuidAndDeletedFalse(id)
                 .orElseThrow(() -> new BusinessException(ExceptionCode.USER_NOT_FOUND));
+        if (me.getRole() == Role.ADMIN) {
+            schoolAccessHelper.assertSameSchool(me, user);
+        }
         user.setActive(Boolean.TRUE.equals(request.getIsActive()));
         userRepository.save(user);
         return userAdminMapper.toDetail(user);
@@ -650,6 +683,21 @@ public class UserManagementServiceImpl implements UserManagementService {
         user.setStudentId(studentId);
         user.setTeacherId(teacherId);
         return user;
+    }
+
+    private void assertRoleChangeAllowed(User actor, User target, Role newRole) {
+        if (actor.getUuid().equals(target.getUuid())) {
+            throw new BusinessException(ExceptionCode.ROLE_SELF_CHANGE);
+        }
+        if (target.getRole() == Role.ADMIN && newRole != Role.ADMIN) {
+            Long schoolId = target.getSchool() != null ? target.getSchool().getId() : null;
+            if (schoolId != null) {
+                long adminCount = userRepository.countBySchool_IdAndRoleAndDeletedFalse(schoolId, Role.ADMIN);
+                if (adminCount <= 1) {
+                    throw new BusinessException(ExceptionCode.LAST_ADMIN_REQUIRED);
+                }
+            }
+        }
     }
 
     private static String blankToNull(String s) {

@@ -21,6 +21,8 @@ public class UserAdminMapper {
                 .deleted(user.isDeleted())
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
+                .schoolId(user.getSchool() != null ? user.getSchool().getId() : null)
+                .schoolName(user.getSchool() != null ? user.getSchool().getName() : null)
                 .build();
     }
 

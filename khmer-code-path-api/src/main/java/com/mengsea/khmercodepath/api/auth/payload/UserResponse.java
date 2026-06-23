@@ -18,4 +18,6 @@ public class UserResponse {
     private boolean isActive;
     private String bio;
     private String avatarUrl;
+    private Long schoolId;
+    private String schoolName;
 }

@@ -10,9 +10,11 @@ import lombok.Data;
 public class DepartmentSummaryPayload {
     private Long id;
     private String name;
-    private String faculty;
+    private Long facultyId;
+    private String facultyName;
     private String headOfDept;
-    private int facultyCount;
+    private int teacherCount;
+    private int classCount;
     private int capacityPercent;
     private DepartmentStatus status;
     private DepartmentAccent accent;

@@ -8,9 +8,13 @@ import java.util.Optional;
 
 public interface DepartmentRepository extends JpaRepository<Department, Long> {
 
-    List<Department> findByDeletedFalseOrderByNameAsc();
+    List<Department> findBySchool_IdAndDeletedFalseOrderByNameAsc(Long schoolId);
+
+    Optional<Department> findByIdAndSchool_IdAndDeletedFalse(Long id, Long schoolId);
 
     Optional<Department> findByIdAndDeletedFalse(Long id);
 
     long countByDeletedFalse();
+
+    long countByFacultyEntity_IdAndDeletedFalse(Long facultyId);
 }

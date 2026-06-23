@@ -2,6 +2,7 @@ package com.mengsea.khmercodepath.commons.repository;
 
 import com.mengsea.khmercodepath.commons.constant.Role;
 import com.mengsea.khmercodepath.commons.domain.User;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
@@ -15,8 +16,10 @@ public interface UserRepository extends JpaRepository<User, String>, JpaSpecific
 
     Optional<User> findByEmail(String email);
 
+    @EntityGraph(attributePaths = "school")
     Optional<User> findByEmailAndDeletedFalse(String email);
 
+    @EntityGraph(attributePaths = "school")
     Optional<User> findByUuidAndDeletedFalse(String uuid);
 
     boolean existsByStudentIdAndDeletedFalse(String studentId);
@@ -31,5 +34,11 @@ public interface UserRepository extends JpaRepository<User, String>, JpaSpecific
 
     long countByRoleAndDeletedFalse(Role role);
 
+    long countBySchool_IdAndRoleAndDeletedFalse(Long schoolId, Role role);
+
     List<User> findByRoleAndDeletedFalseOrderByUsernameAsc(Role role);
+
+    long countByDepartment_IdAndDeletedFalse(Long departmentId);
+
+    List<User> findByDepartment_IdAndDeletedFalseOrderByUsernameAsc(Long departmentId);
 }
