@@ -1,7 +1,6 @@
 package com.mengsea.khmercodepath.api.faculties.controller;
 
 import com.mengsea.khmercodepath.api.faculties.payload.CreateFacultyRequest;
-import com.mengsea.khmercodepath.api.faculties.payload.FacultyConfigPayload;
 import com.mengsea.khmercodepath.api.faculties.payload.FacultySummaryPayload;
 import com.mengsea.khmercodepath.api.faculties.payload.UpdateFacultyRequest;
 import com.mengsea.khmercodepath.api.faculties.service.FacultyCoverService;
@@ -49,14 +48,6 @@ public class SchoolFacultyController {
     private final FacultyManagementService facultyManagementService;
     private final FacultyCoverService facultyCoverService;
     private final SchoolAccessHelper schoolAccessHelper;
-
-    @Operation(summary = "FAC-1400 · Faculties UI config")
-    @GetMapping("/config")
-    @PreAuthorize("hasAuthority('" + LmsAuthority.SCHOOL_MANAGE + "')")
-    public ResponseEntity<ApiResponse<FacultyConfigPayload>> getConfig() {
-        FacultyConfigPayload data = facultyManagementService.getConfig();
-        return ResponseEntity.ok(ApiResponses.of("FAC-1400", LmsStatusCode.SUCCESS, null, data));
-    }
 
     @Operation(summary = "FAC-1410 · List school faculties")
     @GetMapping

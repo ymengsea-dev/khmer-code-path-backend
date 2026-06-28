@@ -12,6 +12,7 @@ import com.mengsea.khmercodepath.api.quiz.payload.QuizSummaryDto;
 import com.mengsea.khmercodepath.api.quiz.payload.QuizWrongAnswerDto;
 import com.mengsea.khmercodepath.api.quiz.payload.SubmitAnswersRequest;
 import com.mengsea.khmercodepath.api.quiz.payload.UpdateQuizRequest;
+import com.mengsea.khmercodepath.api.grades.service.ClassWeightedGradeService;
 import com.mengsea.khmercodepath.commons.constant.ExceptionCode;
 import com.mengsea.khmercodepath.commons.constant.LmsAuthority;
 import com.mengsea.khmercodepath.commons.domain.LmsClass;
@@ -34,6 +35,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -51,6 +53,7 @@ public class QuizServiceImpl implements QuizService {
     private final UserRepository userRepository;
     private final ClassEnrollmentRepository classEnrollmentRepository;
     private final ObjectMapper objectMapper;
+    private final ClassWeightedGradeService classWeightedGradeService;
 
     // ── Publish ──────────────────────────────────────────────────────────────
 
@@ -74,6 +77,7 @@ public class QuizServiceImpl implements QuizService {
         quiz.setGeneratedContent(request.getGeneratedContent());
         quiz.setQuestionCount(request.getQuestionCount());
         quiz.setDurationMinutes(request.getDurationMinutes());
+        quiz.setDueAt(request.getDueAt());
         quiz.setStatus("PUBLISHED");
         quiz = quizRepository.save(quiz);
 
@@ -120,6 +124,13 @@ public class QuizServiceImpl implements QuizService {
         String currentUuid = SecurityUtils.requireCurrentUser().getUuid();
         boolean isTeacher = quiz.getLmsClass().getTeacher().getUuid().equals(currentUuid);
 
+        if (!isTeacher) {
+            assertStudentEnrolled(quiz, currentUuid);
+            if (quizSubmissionRepository.findByQuiz_IdAndStudent_Uuid(quizId, currentUuid).isEmpty()) {
+                assertBeforeDeadline(quiz);
+            }
+        }
+
         List<QuizQuestion> questions = quizQuestionRepository.findByQuiz_IdOrderByOrderIndex(quizId);
 
         String subStatus = null;
@@ -149,6 +160,9 @@ public class QuizServiceImpl implements QuizService {
 
         Quiz quiz = quizRepository.findByIdAndDeletedFalse(quizId)
                 .orElseThrow(() -> new BusinessException(ExceptionCode.QUIZ_NOT_FOUND));
+
+        assertStudentEnrolled(quiz, studentUuid);
+        assertBeforeDeadline(quiz);
 
         if (quizSubmissionRepository.existsByQuiz_IdAndStudent_Uuid(quizId, studentUuid)) {
             throw new BusinessException(ExceptionCode.QUIZ_ALREADY_SUBMITTED);
@@ -182,6 +196,8 @@ public class QuizServiceImpl implements QuizService {
         submission.setStatus("SUBMITTED");
         submission = quizSubmissionRepository.save(submission);
 
+        classWeightedGradeService.recalculate(quiz.getLmsClass().getId(), studentUuid);
+
         return QuizAttemptResultDto.builder()
                 .quizId(quizId)
                 .score(correct)
@@ -202,6 +218,8 @@ public class QuizServiceImpl implements QuizService {
         Quiz quiz = quizRepository.findByIdAndDeletedFalse(quizId)
                 .orElseThrow(() -> new BusinessException(ExceptionCode.QUIZ_NOT_FOUND));
 
+        assertStudentEnrolled(quiz, studentUuid);
+
         // Upsert: if already failed/submitted, ignore
         quizSubmissionRepository.findByQuiz_IdAndStudent_Uuid(quizId, studentUuid)
                 .ifPresentOrElse(
@@ -215,6 +233,7 @@ public class QuizServiceImpl implements QuizService {
                             sub.setStatus("FAILED");
                             sub.setFailReason(reason);
                             quizSubmissionRepository.save(sub);
+                            classWeightedGradeService.recalculate(quiz.getLmsClass().getId(), studentUuid);
                         }
                 );
     }
@@ -295,6 +314,7 @@ public class QuizServiceImpl implements QuizService {
         quiz.setGeneratedContent(request.getGeneratedContent());
         quiz.setQuestionCount(request.getQuestionCount());
         quiz.setDurationMinutes(request.getDurationMinutes());
+        quiz.setDueAt(request.getDueAt());
         quiz = quizRepository.save(quiz);
 
         quizQuestionRepository.deleteByQuiz_Id(quizId);
@@ -413,9 +433,28 @@ public class QuizServiceImpl implements QuizService {
                 .status(quiz.getStatus())
                 .createdAt(quiz.getCreatedAt())
                 .dueAt(quiz.getDueAt())
+                .strictProctoring(true)
+                .pastDue(isPastDue(quiz))
                 .questions(null)
                 .submissionStatus(submissionStatus)
                 .build();
+    }
+
+    private void assertStudentEnrolled(Quiz quiz, String studentUuid) {
+        if (!classEnrollmentRepository.existsByLmsClass_IdAndStudent_Uuid(
+                quiz.getLmsClass().getId(), studentUuid)) {
+            throw new BusinessException(ExceptionCode.ACCESS_DENIED);
+        }
+    }
+
+    private void assertBeforeDeadline(Quiz quiz) {
+        if (isPastDue(quiz)) {
+            throw new BusinessException(ExceptionCode.QUIZ_DEADLINE_PASSED);
+        }
+    }
+
+    private static boolean isPastDue(Quiz quiz) {
+        return quiz.getDueAt() != null && LocalDateTime.now().isAfter(quiz.getDueAt());
     }
 
     private QuizDto toDtoWithTeacherCounts(Quiz quiz, String submissionStatus) {

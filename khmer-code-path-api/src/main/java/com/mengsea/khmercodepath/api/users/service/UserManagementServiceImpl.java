@@ -6,10 +6,8 @@ import com.mengsea.khmercodepath.api.users.payload.CreateUserRequest;
 import com.mengsea.khmercodepath.api.users.payload.StudentDetailPayload;
 import com.mengsea.khmercodepath.api.users.payload.StudentPagePayload;
 import com.mengsea.khmercodepath.api.users.payload.StudentSummaryPayload;
-import com.mengsea.khmercodepath.api.users.payload.StatusFilterPayload;
 import com.mengsea.khmercodepath.api.users.payload.UserManagementActionsPayload;
 import com.mengsea.khmercodepath.api.users.payload.UserManagementConfigPayload;
-import com.mengsea.khmercodepath.api.users.payload.UserTabPayload;
 import com.mengsea.khmercodepath.api.users.payload.UpdateUserRequest;
 import com.mengsea.khmercodepath.api.users.payload.UserDetailPayload;
 import com.mengsea.khmercodepath.api.users.payload.UserImportErrorPayload;
@@ -73,28 +71,6 @@ public class UserManagementServiceImpl implements UserManagementService {
     private final ClassEnrollmentRepository classEnrollmentRepository;
     private final SchoolAccessHelper schoolAccessHelper;
 
-    private static final List<StatusFilterPayload> STATUS_FILTERS = List.of(
-            StatusFilterPayload.builder().value("all").label("All Status").build(),
-            StatusFilterPayload.builder().value("active").label("Active").build(),
-            StatusFilterPayload.builder().value("inactive").label("Inactive").build()
-    );
-
-    private static final List<UserTabPayload> ADMIN_TABS = List.of(
-            UserTabPayload.builder().id("all").label("All Users").build(),
-            UserTabPayload.builder().id("students").label("Students").build(),
-            UserTabPayload.builder().id("teachers").label("Teachers").build(),
-            UserTabPayload.builder().id("admins").label("Administrators").build()
-    );
-
-    private static final List<String> CARD_GRADIENTS = List.of(
-            "from-violet-500 to-indigo-600",
-            "from-sky-500 to-blue-600",
-            "from-emerald-500 to-teal-600",
-            "from-fuchsia-500 to-purple-600",
-            "from-amber-500 to-orange-600",
-            "from-rose-500 to-pink-600"
-    );
-
     @Override
     @Transactional(readOnly = true)
     public UserManagementConfigPayload getConfig() {
@@ -102,33 +78,12 @@ public class UserManagementServiceImpl implements UserManagementService {
         boolean isAdmin = me.getRole() == Role.ADMIN;
         List<ClassFilterPayload> classFilters = buildClassFilters(me);
 
-        if (isAdmin) {
-            return UserManagementConfigPayload.builder()
-                    .pageTitle("Student Management")
-                    .pageDescription("Manage students, teachers, and administrators at your school.")
-                    .tabs(ADMIN_TABS)
-                    .statusFilters(STATUS_FILTERS)
-                    .classFilters(classFilters)
-                    .cardGradients(CARD_GRADIENTS)
-                    .actions(UserManagementActionsPayload.builder()
-                            .canAdd(true)
-                            .canImport(true)
-                            .canEditStatus(true)
-                            .build())
-                    .build();
-        }
-
         return UserManagementConfigPayload.builder()
-                .pageTitle("Student Management")
-                .pageDescription("Students enrolled in your classes.")
-                .tabs(List.of())
-                .statusFilters(STATUS_FILTERS)
                 .classFilters(classFilters)
-                .cardGradients(CARD_GRADIENTS)
                 .actions(UserManagementActionsPayload.builder()
-                        .canAdd(false)
-                        .canImport(false)
-                        .canEditStatus(false)
+                        .canAdd(isAdmin)
+                        .canImport(isAdmin)
+                        .canEditStatus(isAdmin)
                         .build())
                 .build();
     }

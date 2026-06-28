@@ -1,6 +1,5 @@
 package com.mengsea.khmercodepath.api.permissions.controller;
 
-import com.mengsea.khmercodepath.api.permissions.payload.PermissionsConfigPayload;
 import com.mengsea.khmercodepath.api.permissions.payload.RolePermissionsPayload;
 import com.mengsea.khmercodepath.api.permissions.payload.SchoolFeaturesPayload;
 import com.mengsea.khmercodepath.api.permissions.payload.UpdateRolePermissionsRequest;
@@ -32,14 +31,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class SchoolPermissionsController {
 
     private final TeacherPermissionManagementService teacherPermissionManagementService;
-
-    @Operation(summary = "SCH-1300 · Permissions UI config")
-    @GetMapping("/config")
-    @PreAuthorize("hasAuthority('" + LmsAuthority.SCHOOL_MANAGE + "')")
-    public ResponseEntity<ApiResponse<PermissionsConfigPayload>> getConfig() {
-        PermissionsConfigPayload data = teacherPermissionManagementService.getConfig();
-        return ResponseEntity.ok(ApiResponses.of("SCH-1300", LmsStatusCode.SUCCESS, null, data));
-    }
 
     @Operation(summary = "SCH-1310 · Get school-wide teacher permissions")
     @GetMapping("/teachers")

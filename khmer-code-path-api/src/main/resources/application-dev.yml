@@ -1,11 +1,25 @@
+app:
+  frontend-url: ${FRONTEND_URL:http://localhost:3000}
+
 spring:
+  output:
+    ansi:
+      enabled: ALWAYS
   flyway:
+    enabled: true
+    locations: classpath:db/migration,classpath:db/seed
     baseline-on-migrate: true
     baseline-version: 0
   datasource:
     url: jdbc:postgresql://localhost:5433/khmercodepathdb
     username: postgres
     password: password
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: validate
+    show-sql: ${SHOW_SQL:false}
   data:
     redis:
       host: localhost
@@ -19,38 +33,34 @@ spring:
           google:
             client-id: ${GOOGLE_CLIENT_ID:000000000000-000000000000000000000.apps.googleusercontent.com}
             client-secret: ${GOOGLE_CLIENT_SECRET:GOCSPX-not-a-real-secret}
+            scope:
+              - email
+              - profile
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 55MB
   ai:
-    google:
-      genai:
-        api-key: ${GOOGLE_AI_API_KEY}
-        chat:
-          options:
-            model: ${GOOGLE_AI_MODEL}
-        embedding:
-          api-key: ${GOOGLE_AI_API_KEY}
-          text:
-            options:
-              model: ${OPTION_MODEL:text-embedding-004}
-              dimensions: 768
-
-  material-library:
-    upload-accept: ".pdf,.pptx,.docx"
-    views:
-      - id: all
-        label: All
-        search-placeholder: Search templates and files…
-      - id: templates
-        label: Templates
-        search-placeholder: Search templates…
-      - id: files
-        label: File attachments
-        search-placeholder: Search file attachments…
-    create-defaults:
-      title: New Lesson Template
-      icon-type: SLIDES
-      gradient: from-violet-800 to-violet-600
-  jpa:
-    show-sql: ${SHOW_SQL:false}
+    model:
+      chat: ollama
+      embedding: ollama
+    ollama:
+      base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+      init:
+        pull-model-strategy: ${OLLAMA_PULL_MODEL_STRATEGY:never}
+      chat:
+        options:
+          model: ${OLLAMA_CHAT_MODEL:gemma3:4b}
+          temperature: 0.7
+      embedding:
+        options:
+          model: ${OLLAMA_EMBEDDING_MODEL:nomic-embed-text}
+    vectorstore:
+      pgvector:
+        initialize-schema: true
+        dimensions: 768
+        distance-type: COSINE_DISTANCE
+        index-type: HNSW
 
 jwt:
   secret: ${JWT_SECRET:YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY3ODkwMTIzNA==}
@@ -62,3 +72,29 @@ minio:
   access-key: ${MINIO_ACCESS_KEY:minioadmin}
   secret-key: ${MINIO_SECRET_KEY:minioadmin123}
   bucket-name: ${MINIO_BUCKET_NAME:khmer-code-path}
+
+lms:
+  storage:
+    provider: minio
+  school:
+    public-base-url: ${FRONTEND_URL:http://localhost:3000}
+    registration-path-prefix: /register/
+  ai:
+    enabled: ${AI_ENABLED:true}
+    history-window: 20
+    ingest-on-startup: false
+    health-check-cache-seconds: 30
+    health-check-failure-cache-seconds: 15
+  material-library:
+    file-pool:
+      max-files: 100
+  classes:
+    create-defaults:
+      semester: Semester 1
+      academic-year: 2026
+    grading-weights:
+      attendance: 10
+      assignment: 10
+      quiz: 5
+      midterm: 25
+      final-exam: 50

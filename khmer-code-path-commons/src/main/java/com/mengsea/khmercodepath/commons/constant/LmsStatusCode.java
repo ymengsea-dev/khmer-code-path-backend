@@ -18,6 +18,7 @@ public enum LmsStatusCode {
     NOT_FOUND("LMS-3000", "Not Found", HttpStatus.NOT_FOUND),
     CONFLICT("LMS-4000", "Conflict", HttpStatus.CONFLICT),
     OPERATION_NOT_ALLOWED("LMS-4002", "Operation Not Allowed", HttpStatus.FORBIDDEN),
+    SERVICE_UNAVAILABLE("LMS-5003", "Service Unavailable", HttpStatus.SERVICE_UNAVAILABLE),
     INTERNAL_SERVER_ERROR("LMS-9999", "Internal Server Error", HttpStatus.INTERNAL_SERVER_ERROR);
 
     private final String code;

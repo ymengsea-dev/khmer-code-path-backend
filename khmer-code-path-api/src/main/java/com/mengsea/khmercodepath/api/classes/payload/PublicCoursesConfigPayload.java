@@ -10,12 +10,5 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class PublicCoursesConfigPayload {
-    private String pageTitle;
-    private String pageDescription;
-    private String navLabel;
-    private String emptyMessage;
-    private String enrollButtonLabel;
-    private String enrolledLabel;
-    private String searchPlaceholder;
     private boolean enabled;
 }

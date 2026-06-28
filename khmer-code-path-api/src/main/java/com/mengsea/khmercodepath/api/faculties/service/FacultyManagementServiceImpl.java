@@ -1,8 +1,6 @@
 package com.mengsea.khmercodepath.api.faculties.service;
 
-import com.mengsea.khmercodepath.api.faculties.config.FacultiesProperties;
 import com.mengsea.khmercodepath.api.faculties.payload.CreateFacultyRequest;
-import com.mengsea.khmercodepath.api.faculties.payload.FacultyConfigPayload;
 import com.mengsea.khmercodepath.api.faculties.payload.FacultySummaryPayload;
 import com.mengsea.khmercodepath.api.faculties.payload.UpdateFacultyRequest;
 import com.mengsea.khmercodepath.commons.constant.ExceptionCode;
@@ -28,37 +26,6 @@ public class FacultyManagementServiceImpl implements FacultyManagementService {
     private final FacultyRepository facultyRepository;
     private final DepartmentRepository departmentRepository;
     private final SchoolAccessHelper schoolAccessHelper;
-    private final FacultiesProperties facultiesProperties;
-
-    @Override
-    @Transactional(readOnly = true)
-    public FacultyConfigPayload getConfig() {
-        schoolAccessHelper.assertSchoolAdmin(SecurityUtils.requireCurrentUser());
-        return FacultyConfigPayload.builder()
-                .pageTitle(facultiesProperties.getPageTitle())
-                .pageDescription(facultiesProperties.getPageDescription())
-                .sectionTitle(facultiesProperties.getSectionTitle())
-                .sectionDescription(facultiesProperties.getSectionDescription())
-                .nameLabel(facultiesProperties.getNameLabel())
-                .taglineLabel(facultiesProperties.getTaglineLabel())
-                .taglinePlaceholder(facultiesProperties.getTaglinePlaceholder())
-                .addButtonLabel(facultiesProperties.getAddButtonLabel())
-                .saveButtonLabel(facultiesProperties.getSaveButtonLabel())
-                .configureButtonLabel(facultiesProperties.getConfigureButtonLabel())
-                .emptyMessage(facultiesProperties.getEmptyMessage())
-                .departmentCountLabel(facultiesProperties.getDepartmentCountLabel())
-                .coverImageLabel(facultiesProperties.getCoverImageLabel())
-                .coverImageDescription(facultiesProperties.getCoverImageDescription())
-                .uploadCoverLabel(facultiesProperties.getUploadCoverLabel())
-                .removeCoverLabel(facultiesProperties.getRemoveCoverLabel())
-                .configureDialogTitle(facultiesProperties.getConfigureDialogTitle())
-                .configureDialogDescription(facultiesProperties.getConfigureDialogDescription())
-                .backToFacultiesLabel(facultiesProperties.getBackToFacultiesLabel())
-                .searchPlaceholder(facultiesProperties.getSearchPlaceholder())
-                .noResultsMessage(facultiesProperties.getNoResultsMessage())
-                .cardGradients(facultiesProperties.getCardGradients())
-                .build();
-    }
 
     @Override
     @Transactional(readOnly = true)

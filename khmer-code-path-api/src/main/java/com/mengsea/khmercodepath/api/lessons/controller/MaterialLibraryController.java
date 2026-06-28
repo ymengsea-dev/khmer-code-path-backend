@@ -10,7 +10,6 @@ import com.mengsea.khmercodepath.api.ai.payload.QuizGeneratePayload;
 import com.mengsea.khmercodepath.api.ai.service.LibraryAiService;
 import com.mengsea.khmercodepath.api.lessons.payload.LinkLibraryMaterialsRequest;
 import com.mengsea.khmercodepath.api.lessons.payload.LibraryMaterialPayload;
-import com.mengsea.khmercodepath.api.lessons.payload.MaterialLibraryConfigPayload;
 import com.mengsea.khmercodepath.api.lessons.payload.MaterialLibraryItemPayload;
 import com.mengsea.khmercodepath.api.lessons.payload.UpdateLibraryItemRequest;
 import com.mengsea.khmercodepath.api.lessons.service.MaterialLibraryService;
@@ -52,13 +51,6 @@ public class MaterialLibraryController {
 
     private final MaterialLibraryService materialLibraryService;
     private final LibraryAiService libraryAiService;
-
-    @Operation(summary = "Library UI config (tabs, create defaults, upload accept)")
-    @GetMapping("/config")
-    public ResponseEntity<ApiResponse<MaterialLibraryConfigPayload>> getConfig() {
-        MaterialLibraryConfigPayload data = materialLibraryService.getLibraryConfig();
-        return ResponseEntity.ok(ApiResponses.of("LSN-0489", LmsStatusCode.SUCCESS, null, data));
-    }
 
     @Operation(summary = "List standalone files in teacher file pool (not tied to a lesson template)")
     @GetMapping("/files")

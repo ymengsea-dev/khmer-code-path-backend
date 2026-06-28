@@ -1,0 +1,6 @@
+ALTER TABLE quizzes
+    ADD COLUMN IF NOT EXISTS kind VARCHAR(20) NOT NULL DEFAULT 'ASSIGNMENT';
+
+UPDATE quizzes SET kind = 'ASSIGNMENT' WHERE kind IS NULL OR TRIM(kind) = '';
+
+CREATE INDEX IF NOT EXISTS idx_quizzes_kind ON quizzes (kind);

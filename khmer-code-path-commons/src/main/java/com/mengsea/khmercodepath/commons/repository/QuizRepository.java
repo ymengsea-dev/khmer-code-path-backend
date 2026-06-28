@@ -82,4 +82,13 @@ public interface QuizRepository extends JpaRepository<Quiz, Long> {
             AND q.lmsClass.teacher.uuid = :teacherUuid
             """)
     long sumQuestionCountByTeacherUuid(@Param("teacherUuid") String teacherUuid);
+
+    @Query("""
+            SELECT q FROM Quiz q
+            WHERE q.deleted = false
+            AND q.status = 'PUBLISHED'
+            AND q.lmsClass.id = :classId
+            ORDER BY q.createdAt DESC
+            """)
+    List<Quiz> findPublishedByClassId(@Param("classId") Long classId);
 }

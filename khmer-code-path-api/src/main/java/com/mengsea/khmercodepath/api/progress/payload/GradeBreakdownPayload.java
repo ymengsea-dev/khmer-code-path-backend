@@ -10,6 +10,7 @@ import java.math.BigDecimal;
 public class GradeBreakdownPayload {
     private Long classId;
     private String course;
+    private String assignments;
     private String quizzes;
     private String midterm;
     private String finalExam;

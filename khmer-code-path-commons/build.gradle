@@ -23,8 +23,6 @@ dependencies {
     api 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.5'
     api 'io.minio:minio:8.5.10'
 
-    api 'org.springframework.ai:spring-ai-starter-model-google-genai'
-    api 'org.springframework.ai:spring-ai-starter-model-google-genai-embedding'
     api 'org.springframework.ai:spring-ai-starter-model-ollama'
     api 'org.springframework.ai:spring-ai-starter-vector-store-pgvector'
     api 'org.springframework.ai:spring-ai-advisors-vector-store'

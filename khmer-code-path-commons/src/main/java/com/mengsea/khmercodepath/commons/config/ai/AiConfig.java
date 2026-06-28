@@ -1,6 +1,7 @@
 package com.mengsea.khmercodepath.commons.config.ai;
 
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -15,6 +16,7 @@ public class AiConfig {
             """;
 
     @Bean
+    @ConditionalOnBean(ChatClient.Builder.class)
     public ChatClient tutoringChatClient(ChatClient.Builder builder) {
         return builder
                 .defaultSystem(TUTOR_SYSTEM_PROMPT)

@@ -1,6 +1,7 @@
 package com.mengsea.khmercodepath.api.classes.service;
 
 import com.mengsea.khmercodepath.api.departments.service.DepartmentManagementService;
+import com.mengsea.khmercodepath.api.classes.config.ClassUiConstants;
 import com.mengsea.khmercodepath.api.classes.config.ClassesProperties;
 import com.mengsea.khmercodepath.api.classes.payload.AssignStudentsRequest;
 import com.mengsea.khmercodepath.api.classes.payload.ClassConfigPayload;
@@ -9,12 +10,8 @@ import com.mengsea.khmercodepath.api.classes.payload.GradingWeightsPayload;
 import com.mengsea.khmercodepath.api.classes.payload.ClassDetailPayload;
 import com.mengsea.khmercodepath.api.classes.payload.ClassPagePayload;
 import com.mengsea.khmercodepath.api.classes.payload.ClassSettingsConfigPayload;
-import com.mengsea.khmercodepath.api.classes.payload.ClassStatusOptionPayload;
-import com.mengsea.khmercodepath.api.classes.payload.ClassVisibilityOptionPayload;
-import com.mengsea.khmercodepath.api.classes.payload.ScoreComponentPayload;
 import com.mengsea.khmercodepath.api.classes.payload.ClassSummaryPayload;
 import com.mengsea.khmercodepath.api.classes.payload.CreateClassRequest;
-import com.mengsea.khmercodepath.api.classes.payload.LessonTabPayload;
 import com.mengsea.khmercodepath.api.classes.payload.SemesterFilterPayload;
 import com.mengsea.khmercodepath.api.classes.payload.EnrollmentCountsPayload;
 import com.mengsea.khmercodepath.api.classes.payload.LessonsSummaryPayload;
@@ -85,16 +82,10 @@ public class ClassManagementServiceImpl implements ClassManagementService {
     public ClassConfigPayload getClassConfig() {
         User me = SecurityUtils.requireCurrentUser();
         List<SemesterFilterPayload> semesterFilters = buildSemesterFilters(me);
-        List<LessonTabPayload> lessonTabs = classesProperties.getLessonTabs().stream()
-                .map(t -> LessonTabPayload.builder().id(t.getId()).label(t.getLabel()).build())
-                .toList();
         ClassesProperties.CreateDefaults defs = classesProperties.getCreateDefaults();
         ClassesProperties.GradingWeights gw = classesProperties.getGradingWeights();
         return ClassConfigPayload.builder()
-                .allSemestersLabel(classesProperties.getAllSemestersLabel())
                 .semesterFilters(semesterFilters)
-                .lessonTabs(lessonTabs)
-                .cardGradients(classesProperties.getCardGradients())
                 .createDefaults(ClassCreateDefaultsPayload.builder()
                         .semester(defs.getSemester())
                         .academicYear(defs.getAcademicYear())
@@ -106,7 +97,6 @@ public class ClassManagementServiceImpl implements ClassManagementService {
                         .midterm(gw.getMidterm())
                         .finalExam(gw.getFinalExam())
                         .build())
-                .scoreComponents(buildScoreComponents())
                 .departmentOptions(departmentManagementService.listDepartmentOptions())
                 .build();
     }
@@ -122,32 +112,16 @@ public class ClassManagementServiceImpl implements ClassManagementService {
         return ClassSettingsConfigPayload.builder()
                 .classId(entity.getId())
                 .className(entity.getName())
-                .tabs(classesProperties.getSettingsTabs().stream()
-                        .map(t -> LessonTabPayload.builder().id(t.getId()).label(t.getLabel()).build())
-                        .toList())
-                .scoreComponents(buildScoreComponents())
-                .statusOptions(List.of(
-                        ClassStatusOptionPayload.builder().value(ClassStatus.ACTIVE).label("Active").build(),
-                        ClassStatusOptionPayload.builder().value(ClassStatus.DRAFT).label("Draft").build(),
-                        ClassStatusOptionPayload.builder().value(ClassStatus.ARCHIVED).label("Archived").build()
-                ))
-                .visibilityOptions(buildVisibilityOptions(publicCoursesEnabled))
                 .publicCoursesEnabled(publicCoursesEnabled)
-                .publicCoursesDisabledHint(publicCoursesEnabled
-                        ? null
-                        : classesProperties.getPublicCourses().getDisabledHint())
+                .allowedVisibilityValues(buildAllowedVisibilityValues(publicCoursesEnabled))
                 .departmentOptions(departmentManagementService.listDepartmentOptions())
                 .build();
     }
 
-    private List<ClassVisibilityOptionPayload> buildVisibilityOptions(boolean publicCoursesEnabled) {
-        return classesProperties.getVisibilityOptions().stream()
-                .filter(o -> publicCoursesEnabled || !ClassVisibility.PUBLIC.name().equals(o.getValue()))
-                .map(o -> ClassVisibilityOptionPayload.builder()
-                        .value(ClassVisibility.valueOf(o.getValue()))
-                        .label(o.getLabel())
-                        .description(o.getDescription())
-                        .build())
+    private List<String> buildAllowedVisibilityValues(boolean publicCoursesEnabled) {
+        return ClassUiConstants.VISIBILITY_VALUES.stream()
+                .filter(v -> publicCoursesEnabled || v != ClassVisibility.PUBLIC)
+                .map(Enum::name)
                 .toList();
     }
 
@@ -445,7 +419,7 @@ public class ClassManagementServiceImpl implements ClassManagementService {
     private ClassSummaryPayload toSummary(LmsClass c, int cardIndex) {
         User t = c.getTeacher();
         long enrolled = classEnrollmentRepository.countByLmsClass_Id(c.getId());
-        List<String> gradients = classesProperties.getCardGradients();
+        List<String> gradients = ClassUiConstants.CARD_GRADIENTS;
         String gradient = gradients.isEmpty()
                 ? "from-violet-600 to-fuchsia-700"
                 : gradients.get(Math.floorMod(cardIndex, gradients.size()));
@@ -480,7 +454,7 @@ public class ClassManagementServiceImpl implements ClassManagementService {
     }
 
     private List<SemesterFilterPayload> buildSemesterFilters(User me) {
-        String allLabel = classesProperties.getAllSemestersLabel();
+        String allLabel = ClassUiConstants.ALL_SEMESTERS_LABEL;
         List<SemesterFilterPayload> filters = new ArrayList<>();
         filters.add(SemesterFilterPayload.builder()
                 .value(allLabel)
@@ -580,16 +554,6 @@ public class ClassManagementServiceImpl implements ClassManagementService {
             return null;
         }
         return s.trim();
-    }
-
-    private List<ScoreComponentPayload> buildScoreComponents() {
-        return classesProperties.getScoreComponents().stream()
-                .map(c -> ScoreComponentPayload.builder()
-                        .key(c.getKey())
-                        .label(c.getLabel())
-                        .color(c.getColor())
-                        .build())
-                .toList();
     }
 
     private void applyDefaultGradingWeights(LmsClass entity) {

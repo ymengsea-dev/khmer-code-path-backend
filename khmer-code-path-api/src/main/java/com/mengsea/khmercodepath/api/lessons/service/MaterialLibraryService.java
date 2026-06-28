@@ -5,7 +5,6 @@ import com.mengsea.khmercodepath.api.lessons.payload.CreateLibraryItemRequest;
 import com.mengsea.khmercodepath.api.lessons.payload.LessonDetailPayload;
 import com.mengsea.khmercodepath.api.lessons.payload.LinkLibraryMaterialsRequest;
 import com.mengsea.khmercodepath.api.lessons.payload.LibraryMaterialPayload;
-import com.mengsea.khmercodepath.api.lessons.payload.MaterialLibraryConfigPayload;
 import com.mengsea.khmercodepath.api.lessons.payload.MaterialLibraryItemPayload;
 import com.mengsea.khmercodepath.api.lessons.payload.UpdateLibraryItemRequest;
 import com.mengsea.khmercodepath.commons.constant.LibraryIconType;
@@ -14,8 +13,6 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
 
 public interface MaterialLibraryService {
-
-    MaterialLibraryConfigPayload getLibraryConfig();
 
     List<MaterialLibraryItemPayload> listLibrary(String search, String moduleTag);
 

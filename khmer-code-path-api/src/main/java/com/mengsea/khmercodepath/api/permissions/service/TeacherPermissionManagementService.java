@@ -1,14 +1,7 @@
 package com.mengsea.khmercodepath.api.permissions.service;
 
-import com.mengsea.khmercodepath.api.permissions.config.PermissionsProperties;
-import com.mengsea.khmercodepath.api.permissions.payload.AssignableRolePayload;
-import com.mengsea.khmercodepath.api.permissions.payload.GrantablePermissionPayload;
-import com.mengsea.khmercodepath.api.permissions.payload.GrantableStudentPermissionPayload;
-import com.mengsea.khmercodepath.api.permissions.payload.PermissionHighlightPayload;
-import com.mengsea.khmercodepath.api.permissions.payload.PermissionsConfigPayload;
-import com.mengsea.khmercodepath.api.permissions.payload.PermissionsTabPayload;
+import com.mengsea.khmercodepath.api.permissions.config.PermissionsCatalog;
 import com.mengsea.khmercodepath.api.permissions.payload.RolePermissionsPayload;
-import com.mengsea.khmercodepath.api.permissions.payload.RoleSummaryPayload;
 import com.mengsea.khmercodepath.api.permissions.payload.TeacherPermissionStatePayload;
 import com.mengsea.khmercodepath.api.permissions.payload.UpdateRolePermissionsRequest;
 import com.mengsea.khmercodepath.commons.constant.ExceptionCode;
@@ -37,74 +30,10 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class TeacherPermissionManagementService {
 
-    private final PermissionsProperties permissionsProperties;
+    private final PermissionsCatalog permissionsCatalog;
     private final SchoolRolePermissionRepository schoolRolePermissionRepository;
     private final SchoolRepository schoolRepository;
     private final SchoolAccessHelper schoolAccessHelper;
-
-    @Transactional(readOnly = true)
-    public PermissionsConfigPayload getConfig() {
-        schoolAccessHelper.assertSchoolAdmin(SecurityUtils.requireCurrentUser());
-        return PermissionsConfigPayload.builder()
-                .pageTitle(permissionsProperties.getPageTitle())
-                .pageDescription(permissionsProperties.getPageDescription())
-                .selectTeacherLabel(permissionsProperties.getSelectTeacherLabel())
-                .saveButtonLabel(permissionsProperties.getSaveButtonLabel())
-                .teacherSectionTitle(permissionsProperties.getTeacherSectionTitle())
-                .teacherSectionDescription(permissionsProperties.getTeacherSectionDescription())
-                .studentSectionTitle(permissionsProperties.getStudentSectionTitle())
-                .studentSectionDescription(permissionsProperties.getStudentSectionDescription())
-                .rolesSectionTitle(permissionsProperties.getRolesSectionTitle())
-                .rolesSectionDescription(permissionsProperties.getRolesSectionDescription())
-                .roleColumnLabel(permissionsProperties.getRoleColumnLabel())
-                .statusColumnLabel(permissionsProperties.getStatusColumnLabel())
-                .schoolFeaturesSectionTitle(permissionsProperties.getSchoolFeaturesSectionTitle())
-                .schoolFeaturesSectionDescription(permissionsProperties.getSchoolFeaturesSectionDescription())
-                .publicCoursesFeatureLabel(permissionsProperties.getPublicCoursesFeatureLabel())
-                .publicCoursesFeatureDescription(permissionsProperties.getPublicCoursesFeatureDescription())
-                .tabs(permissionsProperties.getTabs().stream()
-                        .map(t -> PermissionsTabPayload.builder()
-                                .id(t.getId())
-                                .label(t.getLabel())
-                                .build())
-                        .toList())
-                .assignableRoles(permissionsProperties.getAssignableRoles().stream()
-                        .map(r -> AssignableRolePayload.builder()
-                                .role(r.getRole())
-                                .label(r.getLabel())
-                                .build())
-                        .toList())
-                .roleSummaries(permissionsProperties.getRoleSummaries().stream()
-                        .map(r -> RoleSummaryPayload.builder()
-                                .role(r.getRole())
-                                .title(r.getTitle())
-                                .description(r.getDescription())
-                                .highlights(r.getHighlights().stream()
-                                        .map(h -> PermissionHighlightPayload.builder()
-                                                .label(h.getLabel())
-                                                .granted(h.isGranted())
-                                                .build())
-                                        .toList())
-                                .build())
-                        .toList())
-                .grantablePermissions(permissionsProperties.getGrantable().stream()
-                        .map(g -> GrantablePermissionPayload.builder()
-                                .authority(g.getAuthority())
-                                .label(g.getLabel())
-                                .description(g.getDescription())
-                                .defaultForTeacher(g.isDefaultForTeacher())
-                                .build())
-                        .toList())
-                .grantableStudentPermissions(permissionsProperties.getGrantableStudents().stream()
-                        .map(g -> GrantableStudentPermissionPayload.builder()
-                                .authority(g.getAuthority())
-                                .label(g.getLabel())
-                                .description(g.getDescription())
-                                .defaultForStudent(g.isDefaultForStudent())
-                                .build())
-                        .toList())
-                .build();
-    }
 
     @Transactional(readOnly = true)
     public RolePermissionsPayload getTeacherPermissions() {
@@ -160,11 +89,11 @@ public class TeacherPermissionManagementService {
 
         Map<String, SchoolRolePermission> overrides = loadOverrideMap(school.getId(), role);
         List<TeacherPermissionStatePayload> permissions = switch (role) {
-            case TEACHER -> permissionsProperties.getGrantable().stream()
-                    .map(g -> toTeacherState(g, overrides.get(g.getAuthority())))
+            case TEACHER -> permissionsCatalog.teacherGrants().stream()
+                    .map(g -> toTeacherState(g, overrides.get(g.authority())))
                     .toList();
-            case STUDENT -> permissionsProperties.getGrantableStudents().stream()
-                    .map(g -> toStudentState(g, overrides.get(g.getAuthority())))
+            case STUDENT -> permissionsCatalog.studentGrants().stream()
+                    .map(g -> toStudentState(g, overrides.get(g.authority())))
                     .toList();
             default -> List.of();
         };
@@ -229,35 +158,21 @@ public class TeacherPermissionManagementService {
     }
 
     private TeacherPermissionStatePayload toTeacherState(
-            PermissionsProperties.GrantableEntry definition,
+            PermissionsCatalog.TeacherGrant definition,
             SchoolRolePermission override
     ) {
-        return toState(
-                definition.getAuthority(),
-                definition.getLabel(),
-                definition.getDescription(),
-                definition.isDefaultForTeacher(),
-                override
-        );
+        return toState(definition.authority(), definition.defaultForTeacher(), override);
     }
 
     private TeacherPermissionStatePayload toStudentState(
-            PermissionsProperties.StudentGrantableEntry definition,
+            PermissionsCatalog.StudentGrant definition,
             SchoolRolePermission override
     ) {
-        return toState(
-                definition.getAuthority(),
-                definition.getLabel(),
-                definition.getDescription(),
-                definition.isDefaultForStudent(),
-                override
-        );
+        return toState(definition.authority(), definition.defaultForStudent(), override);
     }
 
     private TeacherPermissionStatePayload toState(
             String authority,
-            String label,
-            String description,
             boolean defaultGranted,
             SchoolRolePermission override
     ) {
@@ -269,8 +184,6 @@ public class TeacherPermissionManagementService {
         }
         return TeacherPermissionStatePayload.builder()
                 .authority(authority)
-                .label(label)
-                .description(description)
                 .defaultGranted(defaultGranted)
                 .granted(granted)
                 .overridden(overridden)
@@ -279,29 +192,21 @@ public class TeacherPermissionManagementService {
 
     private Set<String> grantableAuthoritySet(Role role) {
         return switch (role) {
-            case TEACHER -> permissionsProperties.getGrantable().stream()
-                    .map(PermissionsProperties.GrantableEntry::getAuthority)
-                    .collect(java.util.stream.Collectors.toSet());
-            case STUDENT -> permissionsProperties.getGrantableStudents().stream()
-                    .map(PermissionsProperties.StudentGrantableEntry::getAuthority)
-                    .collect(java.util.stream.Collectors.toSet());
+            case TEACHER -> permissionsCatalog.teacherAuthorities();
+            case STUDENT -> permissionsCatalog.studentAuthorities();
             default -> Set.of();
         };
     }
 
     private boolean defaultGrantedFor(Role role, String authority) {
         if (role == Role.TEACHER) {
-            return permissionsProperties.getGrantable().stream()
-                    .filter(g -> authority.equals(g.getAuthority()))
-                    .findFirst()
-                    .map(PermissionsProperties.GrantableEntry::isDefaultForTeacher)
+            return permissionsCatalog.findTeacherGrant(authority)
+                    .map(PermissionsCatalog.TeacherGrant::defaultForTeacher)
                     .orElseThrow(() -> new BusinessException(ExceptionCode.PERMISSION_NOT_GRANTABLE));
         }
         if (role == Role.STUDENT) {
-            return permissionsProperties.getGrantableStudents().stream()
-                    .filter(g -> authority.equals(g.getAuthority()))
-                    .findFirst()
-                    .map(PermissionsProperties.StudentGrantableEntry::isDefaultForStudent)
+            return permissionsCatalog.findStudentGrant(authority)
+                    .map(PermissionsCatalog.StudentGrant::defaultForStudent)
                     .orElseThrow(() -> new BusinessException(ExceptionCode.PERMISSION_NOT_GRANTABLE));
         }
         throw new BusinessException(ExceptionCode.PERMISSION_NOT_GRANTABLE);

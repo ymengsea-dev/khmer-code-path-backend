@@ -1,6 +1,5 @@
 package com.mengsea.khmercodepath.api.schools.controller;
 
-import com.mengsea.khmercodepath.api.schools.payload.SchoolConfigPayload;
 import com.mengsea.khmercodepath.api.schools.payload.SchoolDetailPayload;
 import com.mengsea.khmercodepath.api.schools.payload.UpdateSchoolRequest;
 import com.mengsea.khmercodepath.api.schools.service.SchoolCoverService;
@@ -58,14 +57,6 @@ public class SchoolManagementController {
     ) {
         SchoolDetailPayload data = schoolManagementService.updateMySchool(request);
         return ResponseEntity.ok(ApiResponses.of("SCH-1010", LmsStatusCode.SUCCESS, null, data));
-    }
-
-    @Operation(summary = "SCH-1020 · School management UI config")
-    @GetMapping("/config")
-    @PreAuthorize("hasAuthority('" + LmsAuthority.SCHOOL_MANAGE + "')")
-    public ResponseEntity<ApiResponse<SchoolConfigPayload>> getSchoolConfig() {
-        SchoolConfigPayload data = schoolManagementService.getSchoolConfig();
-        return ResponseEntity.ok(ApiResponses.of("SCH-1020", LmsStatusCode.SUCCESS, null, data));
     }
 
     @Operation(summary = "SCH-1030 · Upload school cover image")

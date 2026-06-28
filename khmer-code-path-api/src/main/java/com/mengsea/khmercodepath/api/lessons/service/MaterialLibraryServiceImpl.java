@@ -7,9 +7,6 @@ import com.mengsea.khmercodepath.api.lessons.payload.LessonDetailPayload;
 import com.mengsea.khmercodepath.api.lessons.payload.LinkLibraryMaterialsRequest;
 import com.mengsea.khmercodepath.api.lessons.payload.LibraryMaterialPayload;
 import com.mengsea.khmercodepath.api.lessons.config.MaterialLibraryProperties;
-import com.mengsea.khmercodepath.api.lessons.payload.LibraryCreateDefaultsPayload;
-import com.mengsea.khmercodepath.api.lessons.payload.LibraryViewPayload;
-import com.mengsea.khmercodepath.api.lessons.payload.MaterialLibraryConfigPayload;
 import com.mengsea.khmercodepath.api.lessons.payload.MaterialLibraryItemPayload;
 import com.mengsea.khmercodepath.api.lessons.payload.UpdateLibraryItemRequest;
 import com.mengsea.khmercodepath.commons.constant.MaterialSourceType;
@@ -44,6 +41,8 @@ import java.util.UUID;
 @Slf4j
 public class MaterialLibraryServiceImpl implements MaterialLibraryService {
 
+    private static final String FILE_POOL_LABEL = "Stored files";
+
     private final MaterialLibraryItemRepository materialLibraryItemRepository;
     private final MaterialLibraryMaterialRepository materialLibraryMaterialRepository;
     private final LessonManagementService lessonManagementService;
@@ -52,29 +51,6 @@ public class MaterialLibraryServiceImpl implements MaterialLibraryService {
     private final MaterialRagVectorService materialRagVectorService;
     private final MaterialRagIndexRepository materialRagIndexRepository;
     private final MaterialLibraryProperties materialLibraryProperties;
-
-    @Override
-    @Transactional(readOnly = true)
-    public MaterialLibraryConfigPayload getLibraryConfig() {
-        List<LibraryViewPayload> views = materialLibraryProperties.getViews().stream()
-                .map(v -> LibraryViewPayload.builder()
-                        .id(v.getId())
-                        .label(v.getLabel())
-                        .searchPlaceholder(v.getSearchPlaceholder())
-                        .build())
-                .toList();
-        MaterialLibraryProperties.CreateDefaults defs = materialLibraryProperties.getCreateDefaults();
-        return MaterialLibraryConfigPayload.builder()
-                .views(views)
-                .createDefaults(LibraryCreateDefaultsPayload.builder()
-                        .title(defs.getTitle())
-                        .iconType(defs.getIconType())
-                        .gradient(defs.getGradient())
-                        .build())
-                .uploadAccept(materialLibraryProperties.getUploadAccept())
-                .filePoolLabel(materialLibraryProperties.getFilePool().getLabel())
-                .build();
-    }
 
     @Override
     @Transactional
@@ -321,7 +297,7 @@ public class MaterialLibraryServiceImpl implements MaterialLibraryService {
         MaterialLibraryItem pool = new MaterialLibraryItem();
         pool.setTeacher(teacher);
         pool.setFilePool(true);
-        pool.setTitle(materialLibraryProperties.getFilePool().getLabel());
+        pool.setTitle(FILE_POOL_LABEL);
         pool.setIconType(LibraryIconType.SLIDES);
         pool.setGradient("from-slate-700 to-slate-500");
         pool.setDeleted(false);

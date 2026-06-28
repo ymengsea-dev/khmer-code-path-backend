@@ -11,8 +11,6 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class TeacherPermissionStatePayload {
     private String authority;
-    private String label;
-    private String description;
     private boolean defaultGranted;
     private boolean granted;
     private boolean overridden;

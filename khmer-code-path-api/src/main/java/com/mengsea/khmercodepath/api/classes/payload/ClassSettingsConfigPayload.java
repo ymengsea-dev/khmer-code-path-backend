@@ -10,11 +10,7 @@ import java.util.List;
 public class ClassSettingsConfigPayload {
     private Long classId;
     private String className;
-    private List<LessonTabPayload> tabs;
-    private List<ScoreComponentPayload> scoreComponents;
-    private List<ClassStatusOptionPayload> statusOptions;
-    private List<ClassVisibilityOptionPayload> visibilityOptions;
     private boolean publicCoursesEnabled;
-    private String publicCoursesDisabledHint;
+    private List<String> allowedVisibilityValues;
     private List<com.mengsea.khmercodepath.api.departments.payload.DepartmentOptionPayload> departmentOptions;
 }

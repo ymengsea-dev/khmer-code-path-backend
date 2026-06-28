@@ -49,6 +49,10 @@ public class Quiz {
     @Column(name = "due_at")
     private LocalDateTime dueAt;
 
+    /** ASSIGNMENT = open practice with deadline; EXAM = proctored (tab-switch fails attempt). */
+    @Column(nullable = false)
+    private String kind = "ASSIGNMENT";
+
     @Column(nullable = false)
     private String status = "PUBLISHED";
 

@@ -6,6 +6,8 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.time.LocalDateTime;
+
 @Getter
 @Setter
 public class PublishQuizRequest {
@@ -25,4 +27,6 @@ public class PublishQuizRequest {
     private int questionCount = 10;
 
     private Integer durationMinutes;
+
+    private LocalDateTime dueAt;
 }

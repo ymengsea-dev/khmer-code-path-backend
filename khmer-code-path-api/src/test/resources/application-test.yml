@@ -11,15 +11,15 @@ spring:
     hibernate:
       ddl-auto: create-drop
     show-sql: false
-  data:
-    redis:
-      host: localhost
-      port: 6379
   autoconfigure:
     exclude:
       - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
       - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
       - org.springframework.boot.autoconfigure.data.redis.RedisReactiveAutoConfiguration
+      - org.springframework.ai.model.ollama.autoconfigure.OllamaApiAutoConfiguration
+      - org.springframework.ai.model.ollama.autoconfigure.OllamaChatAutoConfiguration
+      - org.springframework.ai.model.ollama.autoconfigure.OllamaEmbeddingAutoConfiguration
+      - org.springframework.ai.vectorstore.pgvector.autoconfigure.PgVectorStoreAutoConfiguration
   cache:
     type: simple
   security:
@@ -32,31 +32,10 @@ spring:
             scope:
               - email
               - profile
-  ai:
-    model:
-      chat: google-genai
-      embedding: google-genai
-    google:
-      genai:
-        api-key: test-api-key
-        chat:
-          options:
-            model: gemini-2.0-flash
-            temperature: 0.7
-        embedding:
-          api-key: test-api-key
-          text:
-            options:
-              model: text-embedding-004
-              dimensions: 768
-    vectorstore:
-      pgvector:
-        initialize-schema: false
-        dimensions: 768
-        distance-type: COSINE_DISTANCE
-        index-type: HNSW
 
 lms:
+  ai:
+    enabled: false
   uploads-dir: ./build/test-uploads
   storage:
     provider: local

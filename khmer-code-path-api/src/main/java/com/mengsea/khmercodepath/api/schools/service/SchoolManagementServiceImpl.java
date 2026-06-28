@@ -1,10 +1,7 @@
 package com.mengsea.khmercodepath.api.schools.service;
 
 import com.mengsea.khmercodepath.api.schools.config.SchoolProperties;
-import com.mengsea.khmercodepath.api.schools.payload.SchoolConfigPayload;
-import com.mengsea.khmercodepath.api.schools.payload.SchoolConfigTabPayload;
 import com.mengsea.khmercodepath.api.schools.payload.SchoolDetailPayload;
-import com.mengsea.khmercodepath.api.schools.payload.SchoolProfileConfigPayload;
 import com.mengsea.khmercodepath.api.schools.payload.UpdateSchoolRequest;
 import com.mengsea.khmercodepath.commons.constant.ExceptionCode;
 import com.mengsea.khmercodepath.commons.domain.School;
@@ -17,14 +14,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
 import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
 public class SchoolManagementServiceImpl implements SchoolManagementService {
-
-    private static final List<SchoolConfigTabPayload> ADMIN_TABS = List.of();
 
     private final SchoolRepository schoolRepository;
     private final SchoolAccessHelper schoolAccessHelper;
@@ -68,36 +62,6 @@ public class SchoolManagementServiceImpl implements SchoolManagementService {
 
         schoolRepository.save(school);
         return toDetail(school);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public SchoolConfigPayload getSchoolConfig() {
-        User me = SecurityUtils.requireCurrentUser();
-        schoolAccessHelper.assertSchoolAdmin(me);
-        return SchoolConfigPayload.builder()
-                .pageTitle("School Management")
-                .pageDescription("")
-                .tabs(ADMIN_TABS)
-                .profile(SchoolProfileConfigPayload.builder()
-                        .profileSectionTitle(schoolProperties.getProfileSectionTitle())
-                        .profileSectionDescription(schoolProperties.getProfileSectionDescription())
-                        .nameLabel(schoolProperties.getNameLabel())
-                        .slugLabel(schoolProperties.getSlugLabel())
-                        .taglineLabel(schoolProperties.getTaglineLabel())
-                        .taglinePlaceholder(schoolProperties.getTaglinePlaceholder())
-                        .registrationOpenLabel(schoolProperties.getRegistrationOpenLabel())
-                        .saveProfileLabel(schoolProperties.getSaveProfileLabel())
-                        .coverImageLabel(schoolProperties.getCoverImageLabel())
-                        .coverImageDescription(schoolProperties.getCoverImageDescription())
-                        .uploadCoverLabel(schoolProperties.getUploadCoverLabel())
-                        .removeCoverLabel(schoolProperties.getRemoveCoverLabel())
-                        .registrationUrlLabel(schoolProperties.getRegistrationUrlLabel())
-                        .copyUrlLabel(schoolProperties.getCopyUrlLabel())
-                        .copiedUrlMessage(schoolProperties.getCopiedUrlMessage())
-                        .registrationPathPrefix(schoolProperties.getRegistrationPathPrefix())
-                        .build())
-                .build();
     }
 
     public SchoolDetailPayload toDetail(School school) {

@@ -72,6 +72,8 @@ public enum ExceptionCode {
     INVITATION_ALREADY_RESPONDED(LmsStatusCode.OPERATION_NOT_ALLOWED, "Invitation has already been accepted or declined"),
     STUDENT_ALREADY_ENROLLED(LmsStatusCode.CONFLICT, "Student is already enrolled in this class"),
     AI_CONVERSATION_NOT_FOUND(LmsStatusCode.NOT_FOUND, "AI conversation not found"),
+    AI_SERVICE_UNAVAILABLE(LmsStatusCode.SERVICE_UNAVAILABLE,
+            "AI service is temporarily unavailable. The rest of the app continues to work normally."),
     MATERIAL_RAG_NOT_READY(LmsStatusCode.OPERATION_NOT_ALLOWED,
             "Material is not indexed for AI. Upload a supported file and try again."),
     MATERIAL_RAG_INDEX_FAILED(LmsStatusCode.INTERNAL_SERVER_ERROR,
@@ -80,7 +82,14 @@ public enum ExceptionCode {
     QUIZ_NOT_FOUND(LmsStatusCode.NOT_FOUND, "Quiz not found"),
     QUIZ_ALREADY_SUBMITTED(LmsStatusCode.OPERATION_NOT_ALLOWED, "You have already submitted this quiz"),
     QUIZ_HAS_SUBMISSIONS(LmsStatusCode.OPERATION_NOT_ALLOWED,
-            "This quiz already has student attempts. Duplicate it before editing.");
+            "This quiz already has student attempts. Duplicate it before editing."),
+    QUIZ_DEADLINE_PASSED(LmsStatusCode.OPERATION_NOT_ALLOWED, "The submission deadline has passed"),
+    ASSIGNMENT_NOT_FOUND(LmsStatusCode.NOT_FOUND, "Assignment not found"),
+    ASSIGNMENT_ALREADY_SUBMITTED(LmsStatusCode.OPERATION_NOT_ALLOWED, "You have already submitted this assignment"),
+    ASSIGNMENT_DEADLINE_PASSED(LmsStatusCode.OPERATION_NOT_ALLOWED, "The assignment deadline has passed"),
+    EXAM_NOT_FOUND(LmsStatusCode.NOT_FOUND, "Exam not found"),
+    EXAM_ALREADY_SUBMITTED(LmsStatusCode.OPERATION_NOT_ALLOWED, "You have already submitted this exam"),
+    EXAM_DEADLINE_PASSED(LmsStatusCode.OPERATION_NOT_ALLOWED, "The exam deadline has passed");
 
     private final LmsStatusCode statusCode;
     private final String message;

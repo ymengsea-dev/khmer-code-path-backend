@@ -1,5 +1,6 @@
 package com.mengsea.khmercodepath.api.ai.rag;
 
+import com.mengsea.khmercodepath.api.ai.config.AiAvailabilityService;
 import com.mengsea.khmercodepath.api.ai.gateway.LlmGateway;
 import com.mengsea.khmercodepath.api.storage.UploadStorage;
 import com.mengsea.khmercodepath.commons.constant.ExceptionCode;
@@ -41,8 +42,9 @@ public class MaterialRagVectorService {
     private final MaterialRagIndexRepository ragIndexRepository;
     private final UploadStorage uploadStorage;
     private final MaterialDocumentExtractor documentExtractor;
-    private final VectorStore vectorStore;
+    private final ObjectProvider<VectorStore> vectorStoreProvider;
     private final LlmGateway llmGateway;
+    private final ObjectProvider<AiAvailabilityService> aiAvailabilityProvider;
     private final ObjectProvider<StringRedisTemplate> redisTemplateProvider;
 
     @Transactional
@@ -93,6 +95,7 @@ public class MaterialRagVectorService {
      * Loads file from object storage and builds vectors only when needed (quiz / summary / Q&A).
      */
     public MaterialRagIndex ensureIndexed(MaterialSourceType sourceType, Long sourceId) {
+        ensureAiAvailable();
         MaterialRagIndex index = ragIndexRepository.findBySourceTypeAndSourceId(sourceType, sourceId)
                 .orElseThrow(() -> new BusinessException(ExceptionCode.MATERIAL_NOT_FOUND));
 
@@ -130,7 +133,7 @@ public class MaterialRagVectorService {
                 }
                 enriched.add(new Document(chunk.getText(), meta));
             }
-            vectorStore.add(enriched);
+            vectorStoreProvider.getObject().add(enriched);
             index.setStatus(RagIndexStatus.READY);
             index.setChunkCount(enriched.size());
             index.setIndexedAt(LocalDateTime.now());
@@ -142,9 +145,13 @@ public class MaterialRagVectorService {
             throw ex;
         } catch (Exception ex) {
             log.error("Failed to index material {}", sourceId, ex);
+            aiAvailabilityProvider.ifAvailable(availability -> availability.markUnavailable(ex));
             index.setStatus(RagIndexStatus.FAILED);
             index.setErrorMessage(ex.getMessage());
             ragIndexRepository.save(index);
+            if (isAiUnavailable(ex)) {
+                throw new BusinessException(ExceptionCode.AI_SERVICE_UNAVAILABLE);
+            }
             throw new BusinessException(ExceptionCode.MATERIAL_RAG_INDEX_FAILED);
         }
         return ragIndexRepository.save(index);
@@ -192,13 +199,15 @@ public class MaterialRagVectorService {
     }
 
     public String queryMaterial(MaterialSourceType sourceType, Long sourceId, String question, int topK) {
+        ensureAiAvailable();
         SearchRequest searchRequest = materialSearchRequest(sourceId, question, topK);
         return llmGateway.completeRagQuery(question, searchRequest);
     }
 
     public List<Document> searchMaterial(MaterialSourceType sourceType, Long sourceId, String question, int topK) {
+        ensureAiAvailable();
         ensureIndexed(sourceType, sourceId);
-        return vectorStore.similaritySearch(materialSearchRequest(sourceId, question, topK));
+        return vectorStoreProvider.getObject().similaritySearch(materialSearchRequest(sourceId, question, topK));
     }
 
     @Transactional
@@ -218,6 +227,10 @@ public class MaterialRagVectorService {
     }
 
     private void deleteVectorsForMaterial(Long materialId) {
+        VectorStore vectorStore = vectorStoreProvider.getIfAvailable();
+        if (vectorStore == null) {
+            return;
+        }
         try {
             Filter.Expression filter = new FilterExpressionBuilder()
                     .eq(MaterialRagMetadata.MATERIAL_ID, String.valueOf(materialId))
@@ -237,5 +250,28 @@ public class MaterialRagVectorService {
                 .topK(topK)
                 .filterExpression(filter)
                 .build();
+    }
+
+    private void ensureAiAvailable() {
+        AiAvailabilityService availability = aiAvailabilityProvider.getIfAvailable();
+        if (availability != null && !availability.isAvailable()) {
+            throw new BusinessException(ExceptionCode.AI_SERVICE_UNAVAILABLE);
+        }
+        if (vectorStoreProvider.getIfAvailable() == null) {
+            throw new BusinessException(ExceptionCode.AI_SERVICE_UNAVAILABLE);
+        }
+    }
+
+    private static boolean isAiUnavailable(Throwable ex) {
+        String message = ex.getMessage();
+        if (message == null) {
+            return false;
+        }
+        String lower = message.toLowerCase();
+        return lower.contains("connection refused")
+                || lower.contains("connect timed out")
+                || lower.contains("failed to connect")
+                || lower.contains("503")
+                || lower.contains("404");
     }
 }

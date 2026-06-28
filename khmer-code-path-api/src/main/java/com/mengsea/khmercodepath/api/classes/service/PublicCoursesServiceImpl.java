@@ -1,6 +1,6 @@
 package com.mengsea.khmercodepath.api.classes.service;
 
-import com.mengsea.khmercodepath.api.classes.config.ClassesProperties;
+import com.mengsea.khmercodepath.api.classes.config.ClassUiConstants;
 import com.mengsea.khmercodepath.api.classes.payload.PublicCourseSummaryPayload;
 import com.mengsea.khmercodepath.api.classes.payload.PublicCoursesConfigPayload;
 import com.mengsea.khmercodepath.api.classes.payload.PublicCoursesPagePayload;
@@ -39,7 +39,6 @@ public class PublicCoursesServiceImpl implements PublicCoursesService {
     private final ClassEnrollmentRepository classEnrollmentRepository;
     private final SchoolAccessHelper schoolAccessHelper;
     private final SchoolRepository schoolRepository;
-    private final ClassesProperties classesProperties;
 
     @Override
     @Transactional(readOnly = true)
@@ -47,17 +46,8 @@ public class PublicCoursesServiceImpl implements PublicCoursesService {
         User me = SecurityUtils.requireCurrentUser();
         School school = schoolRepository.findById(schoolAccessHelper.requireSchoolId(me))
                 .orElseThrow(() -> new BusinessException(ExceptionCode.SCHOOL_NOT_FOUND));
-        ClassesProperties.PublicCourses cfg = classesProperties.getPublicCourses();
-        boolean enabled = school.isPublicCoursesEnabled();
         return PublicCoursesConfigPayload.builder()
-                .pageTitle(cfg.getPageTitle())
-                .pageDescription(cfg.getPageDescription())
-                .navLabel(cfg.getNavLabel())
-                .emptyMessage(cfg.getEmptyMessage())
-                .enrollButtonLabel(cfg.getEnrollButtonLabel())
-                .enrolledLabel(cfg.getEnrolledLabel())
-                .searchPlaceholder(cfg.getSearchPlaceholder())
-                .enabled(enabled)
+                .enabled(school.isPublicCoursesEnabled())
                 .build();
     }
 
@@ -148,7 +138,7 @@ public class PublicCoursesServiceImpl implements PublicCoursesService {
     private PublicCourseSummaryPayload toSummary(LmsClass c, int cardIndex, boolean enrolled) {
         User t = c.getTeacher();
         long enrolledCount = classEnrollmentRepository.countByLmsClass_Id(c.getId());
-        List<String> gradients = classesProperties.getCardGradients();
+        List<String> gradients = ClassUiConstants.CARD_GRADIENTS;
         String gradient = gradients.isEmpty()
                 ? "from-violet-600 to-fuchsia-700"
                 : gradients.get(Math.floorMod(cardIndex, gradients.size()));

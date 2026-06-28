@@ -5,6 +5,7 @@ import com.mengsea.khmercodepath.api.progress.payload.ClassProgressPayload;
 import com.mengsea.khmercodepath.api.progress.payload.GradeBreakdownPayload;
 import com.mengsea.khmercodepath.api.progress.payload.ProgressDashboardPayload;
 import com.mengsea.khmercodepath.api.progress.payload.QuizHistoryPayload;
+import com.mengsea.khmercodepath.api.grades.service.ClassWeightedGradeService;
 import com.mengsea.khmercodepath.commons.constant.AttendanceStatus;
 import com.mengsea.khmercodepath.commons.constant.ExceptionCode;
 import com.mengsea.khmercodepath.commons.domain.AttendanceRecord;
@@ -34,6 +35,7 @@ public class ProgressServiceImpl implements ProgressService {
     private final StudentGradeRepository studentGradeRepository;
     private final AttendanceRecordRepository attendanceRecordRepository;
     private final QuizSubmissionRepository quizSubmissionRepository;
+    private final ClassWeightedGradeService classWeightedGradeService;
 
     @Override
     @Transactional(readOnly = true)
@@ -146,34 +148,37 @@ public class ProgressServiceImpl implements ProgressService {
     private GradeBreakdownPayload toBreakdownRow(ClassEnrollment enrollment) {
         Long classId = enrollment.getLmsClass().getId();
         String className = enrollment.getLmsClass().getName();
+        String studentUuid = enrollment.getStudent().getUuid();
+        ClassWeightedGradeService.ComponentScores components =
+                classWeightedGradeService.computeComponents(enrollment.getLmsClass(), studentUuid);
         StudentGrade grade = studentGradeRepository
-                .findFirstByLmsClass_IdAndStudent_UuidOrderByCreatedAtDesc(
-                        classId, enrollment.getStudent().getUuid())
+                .findFirstByLmsClass_IdAndStudent_UuidOrderByCreatedAtDesc(classId, studentUuid)
                 .orElse(null);
-        long attTotal = attendanceRecordRepository.countByStudentUuidAndClass(
-                enrollment.getStudent().getUuid(), classId);
-        long attPresent = attendanceRecordRepository.countPresentByStudentUuidAndClass(
-                enrollment.getStudent().getUuid(), classId);
-        String attendancePct = attTotal == 0
-                ? "—"
-                : BigDecimal.valueOf(attPresent * 100.0 / attTotal)
-                .setScale(0, RoundingMode.HALF_UP) + "%";
-        long quizCount = quizSubmissionRepository.findByStudentUuidWithQuiz(
-                enrollment.getStudent().getUuid()).stream()
-                .filter(s -> s.getQuiz().getLmsClass().getId().equals(classId))
-                .count();
-        String quizzesLabel = quizCount > 0 ? quizCount + " completed" : "—";
-        BigDecimal numeric = grade != null ? grade.getNumericGrade() : null;
+        BigDecimal numeric = components.getWeightedFinal();
+        if (numeric == null && grade != null) {
+            numeric = grade.getNumericGrade();
+        }
+        String letter = grade != null && grade.getLetterGrade() != null
+                ? grade.getLetterGrade()
+                : (numeric != null ? com.mengsea.khmercodepath.api.grades.GradeLetterUtil.toLetter(numeric) : "—");
         return GradeBreakdownPayload.builder()
                 .classId(classId)
                 .course(className)
-                .quizzes(quizzesLabel)
+                .assignments(formatComponentPercent(components.getAssignment()))
+                .quizzes(formatComponentPercent(components.getQuiz()))
                 .midterm("—")
-                .finalExam(numeric != null ? numeric.setScale(0, RoundingMode.HALF_UP) + "%" : "—")
-                .attendance(attendancePct)
+                .finalExam(formatComponentPercent(components.getFinalExam()))
+                .attendance(formatComponentPercent(components.getAttendance()))
                 .numericGrade(numeric)
-                .grade(grade != null ? grade.getLetterGrade() : "—")
+                .grade(numeric != null ? letter : "—")
                 .build();
+    }
+
+    private static String formatComponentPercent(BigDecimal value) {
+        if (value == null) {
+            return "—";
+        }
+        return value.setScale(0, RoundingMode.HALF_UP) + "%";
     }
 
     private QuizHistoryPayload toQuizHistory(QuizSubmission submission) {

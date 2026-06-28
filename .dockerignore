@@ -1,0 +1,11 @@
+.git
+.gitignore
+.gradle
+**/.gradle
+**/build
+.env
+.env.*
+*.md
+docker-compose.yml
+.idea
+*.iml

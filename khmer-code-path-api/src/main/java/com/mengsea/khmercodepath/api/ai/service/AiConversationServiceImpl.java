@@ -7,10 +7,12 @@ import com.mengsea.khmercodepath.api.ai.payload.ConversationPayload;
 import com.mengsea.khmercodepath.api.ai.payload.CreateConversationRequest;
 import com.mengsea.khmercodepath.commons.constant.AiSectionType;
 import com.mengsea.khmercodepath.commons.constant.ChatMessageRole;
+import com.mengsea.khmercodepath.commons.constant.ExceptionCode;
 import com.mengsea.khmercodepath.commons.domain.AiChatMessage;
 import com.mengsea.khmercodepath.commons.domain.AiConversation;
 import com.mengsea.khmercodepath.commons.domain.Lesson;
 import com.mengsea.khmercodepath.commons.domain.User;
+import com.mengsea.khmercodepath.commons.exception.BusinessException;
 import com.mengsea.khmercodepath.commons.repository.AiChatMessageRepository;
 import com.mengsea.khmercodepath.commons.repository.AiConversationRepository;
 import com.mengsea.khmercodepath.commons.repository.LessonRepository;
@@ -129,6 +131,19 @@ public class AiConversationServiceImpl implements AiConversationService {
                 emitter.complete();
             } catch (JsonProcessingException e) {
                 emitter.completeWithError(e);
+            } catch (BusinessException e) {
+                if (e.getExceptionCode() == ExceptionCode.AI_SERVICE_UNAVAILABLE) {
+                    try {
+                        emitter.send(SseEmitter.event()
+                                .name("error")
+                                .data(e.getExceptionCode().getMessage()));
+                        emitter.complete();
+                    } catch (Exception sendEx) {
+                        emitter.completeWithError(sendEx);
+                    }
+                } else {
+                    emitter.completeWithError(e);
+                }
             } catch (Exception e) {
                 emitter.completeWithError(e);
             }
